@@ -14,6 +14,7 @@ import { PlainLyrics } from "./PlainLyrics";
 import { Queue } from "./Queue";
 import { TorchCursor } from "./TorchCursor";
 import { useMediaSession } from "./useMediaSession";
+import { VolumeHud, VolumeSlider } from "./Volume";
 import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
@@ -23,13 +24,26 @@ import { useYouTubePlayer, type ResolveVersion } from "./useYouTubePlayer";
 
 const VIDEO_PREF_KEY = "datlyrics:video";
 const EFFECTS_PREF_KEY = "datlyrics:effects";
+const VOLUME_PREF_KEY = "datlyrics:volume";
 
-/** Background effects are on unless turned off with E. */
+/** Background effects are on unless turned off with E, and always off on phones and tablets. */
 function readEffectsPref(): boolean {
+  if (typeof window === "undefined") return true;
+  // Touch devices: save the battery and GPU (and there's no E key to turn them off).
+  if (window.matchMedia("(pointer: coarse)").matches) return false;
   try {
-    return typeof window === "undefined" || localStorage.getItem(EFFECTS_PREF_KEY) !== "0";
+    return localStorage.getItem(EFFECTS_PREF_KEY) !== "0";
   } catch {
     return true;
+  }
+}
+
+function readVolumePref(): number {
+  try {
+    const v = Number(localStorage.getItem(VOLUME_PREF_KEY));
+    return localStorage.getItem(VOLUME_PREF_KEY) !== null && Number.isFinite(v) ? Math.min(Math.max(v, 0), 100) : 100;
+  } catch {
+    return 100;
   }
 }
 
@@ -51,7 +65,14 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
   // Which upload each queue entry plays as: its song or its music video, per the current mode.
   const resolveFor = (want: "song" | "video"): ResolveVersion => (id) => pickVersion(id, want).then((v) => v.id);
   const resolveVersion = useRef<ResolveVersion>(resolveFor(readVideoPref() ? "video" : "song"));
-  const { snap, clock, controls } = useYouTubePlayer(mountRef, { videoId, listId, resolveVersion });
+  const [volume, setVolume] = useState(readVolumePref);
+  const [volumeHud, setVolumeHud] = useState<number | null>(null);
+  const { snap, clock, controls } = useYouTubePlayer(mountRef, {
+    videoId,
+    listId,
+    resolveVersion,
+    initialVolume: volume,
+  });
   // Durations of uploads we've played, for timeline mapping when switching back to them.
   const durations = useRef(new Map<string, number>());
   // Per-track manual lyrics offset (official videos often have intros the LRC doesn't).
@@ -115,6 +136,20 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     const v = Math.round((offset + delta) * 100) / 100;
     setOffsetState({ id: snap.videoId, value: v });
     flash(`Lyrics offset ${v > 0 ? "+" : ""}${v.toFixed(2)}s`);
+  };
+
+  const changeVolume = (v: number, fromKeys = false) => {
+    const next = Math.min(Math.max(Math.round(v), 0), 100);
+    setVolume(next);
+    controls.setVolume(next);
+    try {
+      localStorage.setItem(VOLUME_PREF_KEY, String(next));
+    } catch {}
+    if (fromKeys) {
+      const id = Date.now();
+      setVolumeHud(id);
+      setTimeout(() => setVolumeHud((h) => (h === id ? null : h)), 1200);
+    }
   };
 
   const toggleEffects = () => {
@@ -213,6 +248,8 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     MediaTrackPrevious: () => controls.prev(),
     " ": () => controls.toggle(),
     k: () => controls.toggle(),
+    ArrowUp: () => changeVolume(volume + 5, true),
+    ArrowDown: () => changeVolume(volume - 5, true),
     ArrowLeft: () => controls.seekBy(-5),
     ArrowRight: () => controls.seekBy(5),
     j: () => controls.seekBy(-10),
@@ -319,8 +356,9 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
         </Link>
         <div className="flex items-center gap-5">
           <p className="text-xs font-medium text-white/40 max-md:hidden">
-            ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · E effects · Space play/pause · ←/→ seek · N/P next/prev · [ ] offset · V video · F fullscreen
+            ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
           </p>
+          <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
           <button
             onClick={openSearch}
             aria-label="Search"
@@ -333,6 +371,8 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
           </button>
         </div>
       </div>
+
+      <VolumeHud volume={volume} show={volumeHud !== null} />
 
       {listId && !queueOpen && <UpNext nextId={nextId} clock={clock} duration={snap.duration} />}
 

@@ -33,6 +33,7 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 | `Space` / `K` | Play / pause |
 | `←` `→` | Seek 5 seconds |
 | `J` `L` | Seek 10 seconds |
+| `↑` `↓` | Volume up / down |
 | `N` / `P` | Next / previous track |
 | `V` | Switch between song and music video |
 | `Q` | Open the queue (playlists) |

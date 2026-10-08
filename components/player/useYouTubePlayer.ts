@@ -124,11 +124,19 @@ export function useYouTubePlayer(
     videoId,
     listId,
     resolveVersion,
-  }: { videoId?: string; listId?: string; resolveVersion: React.RefObject<ResolveVersion> },
+    initialVolume = 100,
+  }: {
+    videoId?: string;
+    listId?: string;
+    resolveVersion: React.RefObject<ResolveVersion>;
+    /** 0–100, applied when the player is ready and kept across tracks. */
+    initialVolume?: number;
+  },
 ) {
   const playerRef = useRef<YT.Player | null>(null);
   const [snap, setSnap] = useState<PlayerSnapshot>(INITIAL);
   const statusRef = useRef<PlayerStatus>("loading");
+  const volumeRef = useRef(initialVolume);
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
   const loadedIdRef = useRef<string | null>(null);
@@ -409,6 +417,8 @@ export function useYouTubePlayer(
           playerVars,
           events: {
             onReady: (e) => {
+              e.target.setVolume(volumeRef.current);
+              if (volumeRef.current === 0) e.target.mute();
               if (!listId) return begin([videoId!], 0);
               let tries = 0;
               listTimer = setInterval(() => {
@@ -471,6 +481,15 @@ export function useYouTubePlayer(
         if (p) p.seekTo(Math.max(0, p.getCurrentTime() + s), true);
       },
       seekTo: (s: number) => playerRef.current?.seekTo(s, true),
+      /** 0–100. The embed keeps it across loads, so it only needs setting on change and on ready. */
+      setVolume: (v: number) => {
+        volumeRef.current = v;
+        const p = playerRef.current;
+        if (!p) return;
+        p.setVolume(v);
+        if (v === 0) p.mute();
+        else p.unMute();
+      },
       getTime: () => playerRef.current?.getCurrentTime() ?? 0,
       next: () => playIndex(indexRef.current + 1),
       playAt: (i: number) => playIndex(i),
