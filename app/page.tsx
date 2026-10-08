@@ -1,5 +1,5 @@
 import { GITHUB_URL } from "@/lib/site";
-import { UrlForm } from "./UrlForm";
+import { HomeSearch } from "./HomeSearch";
 
 export default function Home() {
   return (
@@ -21,9 +21,9 @@ export default function Home() {
         <p className="mt-5 max-w-xl text-[clamp(1.05rem,2vw,1.4rem)] font-medium text-white/55">
           Paste a YouTube song or playlist. Sit back. Sing along.
         </p>
-        <UrlForm />
-        <p className="mt-10 text-sm text-white/35">
-          Press ⌘K to search songs · Works with youtube.com, youtu.be and music.youtube.com links · Lyrics by LRCLIB
+        <HomeSearch />
+        <p className="mt-16 text-sm text-white/35">
+          Works with youtube.com, youtu.be and music.youtube.com links · Lyrics by LRCLIB
         </p>
       </div>
     </main>
