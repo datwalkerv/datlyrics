@@ -69,7 +69,7 @@ export function SyncedLyrics({
       aria-live="polite"
     >
       <motion.div
-        className="absolute inset-x-0 top-0 flex flex-col gap-[clamp(0.9rem,2.6vh,2rem)] pl-4 pr-[4vw]"
+        className="absolute inset-x-0 top-0 flex flex-col gap-[clamp(0.9rem,2.6vh,2rem)] pl-4 pr-[4vw] will-change-transform"
         animate={{ y }}
         initial={false}
         transition={{ type: "spring", stiffness: 70, damping: 18, mass: 0.9 }}

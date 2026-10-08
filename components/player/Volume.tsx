@@ -31,7 +31,7 @@ export function VolumeSlider({ volume, onChange }: { volume: number; onChange: (
   };
 
   return (
-    <div className="cursor-show pointer-events-auto flex items-center gap-2 text-white/75">
+    <div className="cursor-show pointer-events-auto flex items-center gap-2 rounded-full bg-white/10 py-0.5 pr-3.5 pl-0.5 text-white/75 ring-1 ring-white/15 backdrop-blur-xl">
       <button
         aria-label={volume === 0 ? "Unmute" : "Mute"}
         onClick={() => {

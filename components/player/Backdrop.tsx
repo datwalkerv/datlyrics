@@ -9,7 +9,7 @@ import { useEffect, useRef } from "react";
  * tiny upload plus one full-screen blit, instead of the GPU blending half a dozen moving
  * full-screen layers per frame. It's all heavy blur, so the low resolution is invisible.
  *
- * Effects off: the same picture, drawn once and left still. Effects on: it moves, redrawn at ~30
+ * Effects off: the same picture, drawn once and left still. Effects on: it moves, redrawn at ~24
  * fps (the motion is slow enough that more frames wouldn't show). Toggling eases the motion in/out.
  */
 export function Backdrop({
@@ -24,6 +24,7 @@ export function Backdrop({
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
   const engine = useRef<ReturnType<typeof createEngine> | null>(null);
+
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -46,17 +47,16 @@ export function Backdrop({
 
   return (
     <div aria-hidden className="fixed inset-0 -z-10 overflow-hidden bg-neutral-950">
-      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full" />
+      {/* Its own compositing layer: a background frame shouldn't force the lyrics to be redrawn. */}
+      <canvas ref={canvasRef} className="absolute inset-0 h-full w-full will-change-transform" />
       {children}
-      {/* Fine grain keeps the soft gradients from banding on TVs (static, so it costs nothing). */}
-      <div className="ambient-grain absolute inset-0" />
     </div>
   );
 }
 
 const SRC_SIZE = 64; // pre-blurred cover sources
 const LONG_SIDE = 200; // backdrop canvas resolution (long side)
-const FRAME_MS = 33; // ~30 fps while moving
+const FRAME_MS = 42; // ~24 fps while moving: the motion is slow enough that more frames don't show
 const FADE_S = 1.6; // cover crossfade
 const RAMP_S = 1; // effects on/off ease
 const FILTER = "saturate(1.7) brightness(0.9) blur(2px)";
@@ -204,7 +204,7 @@ function createEngine(canvas: HTMLCanvasElement) {
     render();
     const busy = fx > 0 || want > 0 || scenes.some((s) => s.alpha !== s.target);
     if (busy) {
-      // ~30 fps: wait on a timer, then take a frame, so we don't request one every vsync.
+      // ~24 fps: wait on a timer, then take a frame, so we don't request one every vsync.
       timer = setTimeout(() => {
         timer = undefined;
         raf = requestAnimationFrame(step);

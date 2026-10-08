@@ -36,7 +36,7 @@ export function Queue({
       }}
     >
       <motion.aside
-        className="cursor-show absolute inset-y-0 right-0 flex w-[min(28rem,92vw)] flex-col bg-neutral-950/85 shadow-[-40px_0_120px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10"
+        className="cursor-show absolute inset-y-0 right-0 flex w-[min(28rem,92vw)] flex-col bg-black/45 shadow-[-40px_0_120px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 backdrop-blur-2xl"
         initial={{ x: "100%" }}
         animate={{ x: 0 }}
         exit={{ x: "100%" }}

@@ -228,15 +228,17 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     flash(v ? "Music video" : "Song");
   };
 
-  // Where the YouTube iframe sits. Without a video to show it's parked small and invisible, so
-  // YouTube streams a tiny picture instead of decoding HD nobody sees. In video mode it's laid
+  // Where the YouTube iframe sits. Without a video to show it's parked small and off-screen, so
+  // the browser doesn't decode or composite video nobody sees. In video mode it's laid
   // exactly over the media box (the iframe can't be re-parented without reloading, so it follows
   // the box's rect), writing styles only when the box actually moves.
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
     if (!showVideo) {
-      Object.assign(mount.style, { left: "0px", top: "0px", width: "256px", height: "144px", opacity: "0" });
+      // Off-screen, not just transparent: browsers stop decoding and drawing video that's out of
+      // view (audio keeps playing), while a transparent on-screen player still decodes every frame.
+      Object.assign(mount.style, { left: "-10000px", top: "0px", width: "256px", height: "144px", opacity: "0" });
       return;
     }
     let raf = 0;
