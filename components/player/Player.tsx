@@ -13,6 +13,7 @@ import { NowPlaying } from "./NowPlaying";
 import { PlainLyrics } from "./PlainLyrics";
 import { Queue } from "./Queue";
 import { TorchCursor } from "./TorchCursor";
+import { useMediaSession } from "./useMediaSession";
 import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
@@ -203,7 +204,13 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     return () => cancelAnimationFrame(raf);
   }, []);
 
+  useMediaSession({ controls, song, artwork, status: snap.status, duration: snap.duration, clock });
+
   useKeyboard({
+    // Media keys, for browsers that deliver them to the page as key presses.
+    MediaPlayPause: () => controls.toggle(),
+    MediaTrackNext: () => controls.next(),
+    MediaTrackPrevious: () => controls.prev(),
     " ": () => controls.toggle(),
     k: () => controls.toggle(),
     ArrowLeft: () => controls.seekBy(-5),
@@ -383,7 +390,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
                   className="flex size-28 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-transform hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
                   aria-label="Start playback"
                 >
-                  <svg viewBox="0 0 24 24" className="ml-1.5 size-12" fill="currentColor">
+                  <svg viewBox="0 0 24 24" className="size-12" fill="currentColor">
                     <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" />
                   </svg>
                 </button>

@@ -132,6 +132,16 @@ export function useYouTubePlayer(
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
   const loadedIdRef = useRef<string | null>(null);
+  // The embed's own playlist mirrors the queue (see loadId): the uploads it holds, which queue
+  // index its first entry is, where the current track sits, and whether the embed has settled on
+  // it, so its own track changes (media keys, auto-advance) can be told apart from ours.
+  const embedListRef = useRef<string[]>([]);
+  const embedOffsetRef = useRef(0);
+  const embedSlotRef = useRef(0);
+  const armedRef = useRef(false);
+  // Song/video versions already worked out per queue entry, for the current mode.
+  const resolvedRef = useRef(new Map<string, string>());
+  const resolverRef = useRef<ResolveVersion | null>(null);
   // Bumped on every load so a slow version lookup can't override a newer choice.
   const loadSeq = useRef(0);
   // Event handling for the current player.
@@ -168,13 +178,110 @@ export function useYouTubePlayer(
   }, []);
 
   /** Load a specific upload for the current queue slot, optionally at a position. */
+  /** A version already resolved for this queue entry in the current mode, if any. */
+  const cachedVersion = useCallback(
+    (original: string) => {
+      if (resolverRef.current !== resolveVersion.current) {
+        // Song/video mode changed: earlier answers no longer apply.
+        resolverRef.current = resolveVersion.current;
+        resolvedRef.current = new Map();
+      }
+      return resolvedRef.current.get(original);
+    },
+    [resolveVersion],
+  );
+
+  const resolve = useCallback(
+    (original: string) => {
+      const known = cachedVersion(original);
+      if (known) return Promise.resolve(known);
+      const resolver = resolveVersion.current;
+      return resolver(original)
+        .catch(() => original)
+        .then((id) => {
+          if (resolverRef.current === resolver) resolvedRef.current.set(original, id);
+          return id;
+        });
+    },
+    [cachedVersion, resolveVersion],
+  );
+
+  /** Work out the neighbours' versions ahead of time, so the embed's playlist can hold them. */
+  const prefetchAround = useCallback(
+    (i: number) => {
+      const queue = queueRef.current;
+      for (const k of [i + 1, i - 1]) if (k >= 0 && k < queue.length) void resolve(queue[k]);
+    },
+    [resolve],
+  );
+
+  /**
+   * Load an upload for the current queue slot. The embed gets the whole queue as its playlist
+   * (with every version we already know swapped in): the audio plays inside YouTube's embed, so
+   * the browser sends next/previous media keys there, and with the queue loaded the embed can just
+   * move along it, gaplessly. The state handler sees it move and follows (see `follow`).
+   */
   const loadId = useCallback(
     (id: string, start = 0) => {
       loadedIdRef.current = id;
-      playerRef.current?.loadVideoById({ videoId: id, startSeconds: start });
+      const queue = queueRef.current;
+      const i = indexRef.current;
+      // The embed takes at most 200 entries; keep the current track inside that window.
+      const MAX = 200;
+      const from = Math.max(0, Math.min(i - MAX / 2, queue.length - MAX));
+      const list = queue
+        .slice(from, from + MAX)
+        .map((original, k) => (from + k === i ? id : (cachedVersion(original) ?? original)));
+      embedListRef.current = list;
+      embedOffsetRef.current = from;
+      embedSlotRef.current = i - from;
+      armedRef.current = false;
+      playerRef.current?.loadPlaylist(list, i - from, start);
       sync();
+      prefetchAround(i);
     },
-    [sync],
+    [sync, cachedVersion, prefetchAround],
+  );
+
+  /** Take the track the embed moved to as the current one, without reloading anything. */
+  const adopt = useCallback(
+    (queueIndex: number, embedIndex: number) => {
+      indexRef.current = queueIndex;
+      loadedIdRef.current = embedListRef.current[embedIndex];
+      embedSlotRef.current = embedIndex;
+      armedRef.current = true;
+      sync();
+      prefetchAround(queueIndex);
+    },
+    [sync, prefetchAround],
+  );
+
+  /**
+   * The embed moved along its playlist by itself (media keys, or the end of a track). Usually it
+   * is already playing the right upload, so we just follow. If the track should play as the
+   * other version, switch right away, before it gets going.
+   */
+  const follow = useCallback(
+    (embedIndex: number) => {
+      const queueIndex = embedOffsetRef.current + embedIndex;
+      const original = queueRef.current[queueIndex];
+      const playing = embedListRef.current[embedIndex];
+      if (original === undefined || playing === undefined) return;
+      const seq = ++loadSeq.current;
+      const want = cachedVersion(original);
+      if (want && want !== playing) {
+        indexRef.current = queueIndex;
+        loadId(want, 0);
+        return;
+      }
+      adopt(queueIndex, embedIndex);
+      if (!want) {
+        void resolve(original).then((id) => {
+          if (seq === loadSeq.current && id !== playing) loadId(id, 0);
+        });
+      }
+    },
+    [adopt, cachedVersion, loadId, resolve],
   );
 
   const playIndex = useCallback(
@@ -184,10 +291,23 @@ export function useYouTubePlayer(
       indexRef.current = i;
       const seq = ++loadSeq.current;
       sync();
-      const id = await resolveVersion.current(queue[i]).catch(() => queue[i]);
-      if (seq === loadSeq.current) loadId(id);
+      const id = await resolve(queue[i]);
+      if (seq !== loadSeq.current) return;
+      // If the embed already holds that upload in its playlist, just jump there: no reload.
+      const p = playerRef.current;
+      const k = i - embedOffsetRef.current;
+      if (p && embedListRef.current[k] === id) {
+        loadedIdRef.current = id;
+        embedSlotRef.current = k;
+        armedRef.current = false;
+        p.playVideoAt(k);
+        sync();
+        prefetchAround(i);
+      } else {
+        loadId(id, 0);
+      }
     },
-    [resolveVersion, loadId, sync],
+    [resolve, loadId, sync, prefetchAround],
   );
 
   useEffect(() => {
@@ -230,6 +350,13 @@ export function useYouTubePlayer(
           state: (e) => {
             if (e.target !== playerRef.current) return;
             const S = YTApi.PlayerState;
+            const embedIndex = e.target.getPlaylistIndex?.() ?? -1;
+            if (!armedRef.current) {
+              if (e.target.getVideoData?.().video_id === loadedIdRef.current) armedRef.current = true;
+            } else if (embedIndex >= 0 && embedIndex !== embedSlotRef.current) {
+              // The embed moved along its playlist by itself (media keys, or end of a track).
+              follow(embedIndex);
+            }
             if (e.data === S.ENDED) {
               const i = indexRef.current;
               if (i < queueRef.current.length - 1) playIndex(i + 1);
@@ -260,7 +387,13 @@ export function useYouTubePlayer(
           error: (e) => {
             if (e.target !== playerRef.current) return;
             const msg = ERRORS[e.data as number] ?? "This video couldn't be played.";
-            const i = indexRef.current;
+            // If the embed had already moved to a neighbour, that's the track that failed.
+            const embedIndex = e.target.getPlaylistIndex?.() ?? -1;
+            const i =
+              embedIndex >= 0
+                ? Math.min(embedOffsetRef.current + embedIndex, queueRef.current.length - 1)
+                : indexRef.current;
+            indexRef.current = i;
             if (i < queueRef.current.length - 1) {
               // Skip unplayable entries in playlists.
               sync({ error: msg });
@@ -317,7 +450,7 @@ export function useYouTubePlayer(
       setSnap(INITIAL);
       statusRef.current = "loading";
     };
-  }, [mountRef, videoId, listId, sync, playIndex]);
+  }, [mountRef, videoId, listId, sync, playIndex, follow]);
 
   // The clock only reads the refs inside its rAF loop, never during render.
   // eslint-disable-next-line react-hooks/refs

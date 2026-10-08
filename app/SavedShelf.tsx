@@ -66,7 +66,7 @@ function SavedCard({ item, onPlay }: { item: SavedItem; onPlay: () => void }) {
             />
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
-            <svg viewBox="0 0 24 24" className="ml-0.5 size-8 text-white" fill="currentColor" aria-hidden>
+            <svg viewBox="0 0 24 24" className="size-8 text-white" fill="currentColor" aria-hidden>
               <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" />
             </svg>
           </div>

@@ -125,7 +125,7 @@ export function SearchBox({
             className="flex w-full items-center gap-4 rounded-2xl bg-white/10 px-4 py-3 text-left text-white"
           >
             <span className="flex size-10 items-center justify-center rounded-full bg-white text-black">
-              <svg viewBox="0 0 24 24" className="ml-0.5 size-5" fill="currentColor">
+              <svg viewBox="0 0 24 24" className="size-5" fill="currentColor">
                 <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" />
               </svg>
             </span>
