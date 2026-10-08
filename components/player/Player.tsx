@@ -20,6 +20,16 @@ import { fetchLyrics, pickVersion, useArtwork, useLyrics, useSongInfo } from "./
 import { useYouTubePlayer, type ResolveVersion } from "./useYouTubePlayer";
 
 const VIDEO_PREF_KEY = "datlyrics:video";
+const EFFECTS_PREF_KEY = "datlyrics:effects";
+
+/** Background effects are on unless turned off with E. */
+function readEffectsPref(): boolean {
+  try {
+    return typeof window === "undefined" || localStorage.getItem(EFFECTS_PREF_KEY) !== "0";
+  } catch {
+    return true;
+  }
+}
 
 function readVideoPref(): boolean {
   try {
@@ -34,6 +44,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
   const mountRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<HTMLDivElement>(null);
   const [videoMode, setVideoMode] = useState(readVideoPref);
+  const [effects, setEffects] = useState(readEffectsPref);
   const [queueOpen, setQueueOpen] = useState(false);
   // Which upload each queue entry plays as: its song or its music video, per the current mode.
   const resolveFor = (want: "song" | "video"): ResolveVersion => (id) => pickVersion(id, want).then((v) => v.id);
@@ -102,6 +113,15 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     const v = Math.round((offset + delta) * 100) / 100;
     setOffsetState({ id: snap.videoId, value: v });
     flash(`Lyrics offset ${v > 0 ? "+" : ""}${v.toFixed(2)}s`);
+  };
+
+  const toggleEffects = () => {
+    const v = !effects;
+    setEffects(v);
+    try {
+      localStorage.setItem(EFFECTS_PREF_KEY, v ? "1" : "0");
+    } catch {}
+    flash(v ? "Background effects on" : "Background effects off");
   };
 
   /** S: save / unsave what's playing (the playlist if one was opened) to the home page shelf. */
@@ -194,6 +214,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     f: () => toggleFullscreen(),
     v: () => toggleVideo(),
     s: () => toggleSaved(),
+    e: () => toggleEffects(),
     q: () => hasQueue && setQueueOpen((o) => !o),
     "[": () => adjustOffset(-0.25),
     "]": () => adjustOffset(0.25),
@@ -228,7 +249,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
 
   return (
     <main className={`relative isolate h-dvh w-full overflow-hidden text-white ${idle ? "cursor-none" : ""}`}>
-      <Backdrop src={artwork} />
+      <Backdrop src={artwork} animated={effects} />
 
       {/* The real YouTube player: kept rendered (not display:none) so playback isn't throttled, but invisible. */}
       <div
@@ -287,7 +308,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
         </Link>
         <div className="flex items-center gap-5">
           <p className="text-xs font-medium text-white/40 max-md:hidden">
-            ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · Space play/pause · ←/→ seek · N/P next/prev · [ ] offset · V video · F fullscreen
+            ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · E effects · Space play/pause · ←/→ seek · N/P next/prev · [ ] offset · V video · F fullscreen
           </p>
           <button
             onClick={openSearch}

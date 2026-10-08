@@ -19,6 +19,7 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 - **🎬 Song / Video Switch**: Press V to switch between the song and its official music video, like on YouTube Music. Playback carries on at the same lyric line, even when the video has a longer intro or extra breaks.
 - **🖼️ Real Album Art**: Covers come from iTunes and prefer the original release over remixes, so you see the album cover, not a video still.
 - **💾 Saved Favorites**: Keep your favorite songs and playlists on the home page and start one with a single click. Press S while playing to save it, or paste a link into the + card. They're stored in your browser only.
+- **🌌 Living Background**: The blurred cover drifts and breathes while soft patches of it flow across the screen, with a wandering light and fine film grain. It's built to stay smooth on 4K TVs. Press E for a still background.
 - **📃 Queue & Up Next**: Press Q to open the queue and jump to any track. An "Up next" card shows up near the end of each song.
 - **⏯️ Seekable Progress Bar**: Click or drag the progress bar to seek.
 - **⌨️ Keyboard Only**: No buttons on screen. Everything has a shortcut.
@@ -36,6 +37,7 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 | `V` | Switch between song and music video |
 | `Q` | Open the queue (playlists) |
 | `S` | Save / unsave the song or playlist to the home page |
+| `E` | Turn background effects on / off |
 | `[` `]` | Move the lyrics 0.25s earlier / later |
 | `F` | Fullscreen |
 | `Esc` | Close the queue, or go back home |
@@ -72,7 +74,7 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 ## ⚖️ Privacy
 
 - datlyrics has **no accounts, no database, no analytics and no cookies**.
-- The only things saved are your saved songs and playlists and whether you last chose song or video, all in your own browser's local storage.
+- The only things saved are your saved songs and playlists, plus your song / video and background effect choices, all in your own browser's local storage.
 - Search terms, song titles and video IDs go through datlyrics' server to YouTube, LRCLIB and iTunes, so your browser doesn't contact those services itself. Responses are cached, and nothing is logged or stored about you.
 - Playback happens in YouTube's embedded player, so YouTube's own privacy policy applies to what you watch.
 
