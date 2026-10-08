@@ -86,6 +86,7 @@ export function SyncedLyrics({
                 lineRefs.current[i] = el;
               }}
               onClick={() => onSeek(Math.max(line.time - offset, 0))}
+              data-clickable
               className="origin-left cursor-pointer transition-[opacity,filter,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] hover:!opacity-80"
               style={{
                 opacity,

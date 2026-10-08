@@ -12,6 +12,7 @@ import { LyricsToast } from "./LyricsToast";
 import { NowPlaying } from "./NowPlaying";
 import { PlainLyrics } from "./PlainLyrics";
 import { Queue } from "./Queue";
+import { TorchCursor } from "./TorchCursor";
 import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
@@ -248,8 +249,11 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
   const centered = noLyricsMessage !== null;
 
   return (
-    <main className={`relative isolate h-dvh w-full overflow-hidden text-white ${idle ? "cursor-none" : ""}`}>
-      <Backdrop src={artwork} animated={effects} />
+    <main className={`cursor-hidden relative isolate h-dvh w-full overflow-hidden text-white ${idle ? "cursor-idle" : ""}`}>
+      {/* The cursor is hidden on the player; the torch is the cursor, lighting the backdrop under the lyrics. */}
+      <Backdrop src={artwork} animated={effects}>
+        <TorchCursor active={!idle} />
+      </Backdrop>
 
       {/* The real YouTube player: kept rendered (not display:none) so playback isn't throttled, but invisible. */}
       <div
@@ -297,10 +301,10 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
 
       {noLyricsMessage && <LyricsToast key={`${trackKey}:${noLyricsMessage}`} message={noLyricsMessage} />}
 
-      {/* Subtle chrome that appears with the cursor. */}
+      {/* Subtle chrome that appears while the mouse moves. */}
       <div
-        className={`pointer-events-none fixed inset-x-0 top-0 z-20 flex items-center justify-between px-[clamp(1.25rem,3vw,3rem)] py-5 transition-opacity duration-700 ${
-          idle ? "opacity-0" : "opacity-100"
+        className={`fixed inset-x-0 top-0 z-20 flex items-center justify-between px-[clamp(1.25rem,3vw,3rem)] py-5 transition-opacity duration-700 ${
+          idle ? "pointer-events-none opacity-0" : "opacity-100"
         }`}
       >
         <Link href="/" className="pointer-events-auto text-lg font-bold tracking-tight text-white/70 hover:text-white">
@@ -313,7 +317,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
           <button
             onClick={openSearch}
             aria-label="Search"
-            className="pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 backdrop-blur-xl transition hover:bg-white/20 hover:text-white"
+            className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 backdrop-blur-xl transition hover:bg-white/20 hover:text-white"
           >
             <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.4">
               <circle cx="11" cy="11" r="7" />

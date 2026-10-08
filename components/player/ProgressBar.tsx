@@ -53,7 +53,7 @@ export function ProgressBar({
         aria-valuemax={Math.round(duration)}
         aria-valuenow={seconds}
         tabIndex={-1}
-        className={`group relative -my-2 py-2 ${disabled ? "" : "cursor-pointer"} touch-none`}
+        className={`cursor-show group relative -my-2 py-2 ${disabled ? "" : "cursor-pointer"} touch-none`}
         onPointerDown={(e) => {
           if (disabled) return;
           e.currentTarget.setPointerCapture(e.pointerId);

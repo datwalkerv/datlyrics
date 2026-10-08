@@ -8,7 +8,16 @@ import { useEffect, useRef } from "react";
  * `animated` it comes alive: the cover drifts, soft patches of it flow over it, and a pool of
  * light wanders. Off, it's the same picture, standing still.
  */
-export function Backdrop({ src, animated }: { src: string | null; animated: boolean }) {
+export function Backdrop({
+  src,
+  animated,
+  children,
+}: {
+  src: string | null;
+  animated: boolean;
+  /** Light layers drawn above the darkening but below the lyrics (the torch cursor). */
+  children?: React.ReactNode;
+}) {
   return (
     <div aria-hidden className="fixed inset-0 -z-10 overflow-hidden bg-neutral-950">
       <AnimatePresence>
@@ -31,6 +40,7 @@ export function Backdrop({ src, animated }: { src: string | null; animated: bool
       {/* Darken + vignette so white lyrics always read. */}
       <div className="absolute inset-0 bg-black/45" />
       <div className="absolute inset-0 bg-[radial-gradient(ellipse_at_center,transparent_0%,rgba(0,0,0,0.55)_100%)]" />
+      {children}
       {/* Fine grain keeps big soft gradients from banding on TVs. */}
       <div className="ambient-grain absolute inset-0" />
     </div>
