@@ -64,7 +64,7 @@ export function SyncedLyrics({
   return (
     <div
       ref={viewportRef}
-      // Bleed 1rem to the left so blur and breathing dots aren't clipped at the edge.
+      // Bleed 1rem to the left so the breathing dots aren't clipped at the edge.
       className="lyrics-mask relative -ml-4 h-full w-[calc(100%+1rem)] overflow-hidden"
       aria-live="polite"
     >
@@ -77,8 +77,8 @@ export function SyncedLyrics({
         {lines.map((line, i) => {
           const d = i - active;
           const isActive = d === 0;
-          const blur = isActive ? 0 : Math.min(Math.abs(d), 4) * 0.6;
-          const opacity = isActive ? 1 : d < 0 ? 0.32 : Math.max(0.5 - (d - 1) * 0.06, 0.28);
+          // Depth by fading with distance (no blur: a blur per line is very costly on the GPU).
+          const opacity = isActive ? 1 : d < 0 ? Math.max(0.32 - (-d - 1) * 0.05, 0.14) : Math.max(0.5 - (d - 1) * 0.08, 0.18);
           return (
             <div
               key={i}
@@ -87,10 +87,9 @@ export function SyncedLyrics({
               }}
               onClick={() => onSeek(Math.max(line.time - offset, 0))}
               data-clickable
-              className="origin-left cursor-pointer transition-[opacity,filter,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] hover:!opacity-80"
+              className="origin-left cursor-pointer transition-[opacity,transform] duration-700 ease-[cubic-bezier(0.22,1,0.36,1)] hover:!opacity-80"
               style={{
                 opacity,
-                filter: blur ? `blur(${blur}px)` : undefined,
                 transform: isActive ? "scale(1)" : "scale(0.94)",
               }}
             >

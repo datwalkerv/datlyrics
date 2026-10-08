@@ -14,6 +14,7 @@ import { PlainLyrics } from "./PlainLyrics";
 import { Queue } from "./Queue";
 import { TorchCursor } from "./TorchCursor";
 import { useMediaSession } from "./useMediaSession";
+import { isLowEndDevice, usePerformanceGuard } from "./usePerformanceGuard";
 import { VolumeHud, VolumeSlider } from "./Volume";
 import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
@@ -32,10 +33,11 @@ function readEffectsPref(): boolean {
   // Touch devices: save the battery and GPU (and there's no E key to turn them off).
   if (window.matchMedia("(pointer: coarse)").matches) return false;
   try {
-    return localStorage.getItem(EFFECTS_PREF_KEY) !== "0";
-  } catch {
-    return true;
-  }
+    const saved = localStorage.getItem(EFFECTS_PREF_KEY);
+    if (saved !== null) return saved !== "0";
+  } catch {}
+  // No choice made yet: start off on weak hardware, on elsewhere.
+  return !isLowEndDevice();
 }
 
 function readVolumePref(): number {
@@ -61,6 +63,8 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
   const mediaRef = useRef<HTMLDivElement>(null);
   const [videoMode, setVideoMode] = useState(readVideoPref);
   const [effects, setEffects] = useState(readEffectsPref);
+  const [effectsAutoOff, setEffectsAutoOff] = useState(false);
+  const [effectsManual, setEffectsManual] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   // Which upload each queue entry plays as: its song or its music video, per the current mode.
   const resolveFor = (want: "song" | "video"): ResolveVersion => (id) => pickVersion(id, want).then((v) => v.id);
@@ -108,10 +112,6 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     return () => clearTimeout(t);
   }, [showVideo, snap.status, snap.videoId]);
   const videoVisible = showVideo && videoReadyId === snap.videoId;
-  const videoVisibleRef = useRef(false);
-  useEffect(() => {
-    videoVisibleRef.current = videoVisible;
-  }, [videoVisible]);
 
   useEffect(() => {
     resolveVersion.current = resolveFor(videoMode ? "video" : "song");
@@ -126,10 +126,10 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     if (nextId) pickVersion(nextId, videoMode ? "video" : "song").catch(() => {});
   }, [nextId, videoMode]);
 
-  const flash = (text: string) => {
+  const flash = (text: string, ms = 1400) => {
     const id = Date.now();
     setToast({ id, text });
-    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 1400);
+    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), ms);
   };
 
   const adjustOffset = (delta: number) => {
@@ -155,11 +155,24 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
   const toggleEffects = () => {
     const v = !effects;
     setEffects(v);
+    // Turning them back on after an automatic switch-off: trust that choice for this session.
+    if (v && effectsAutoOff) setEffectsManual(true);
     try {
       localStorage.setItem(EFFECTS_PREF_KEY, v ? "1" : "0");
     } catch {}
     flash(v ? "Background effects on" : "Background effects off");
   };
+
+  // Slow device: switch effects off on its own (not saved, so a faster machine gets them next time).
+  usePerformanceGuard({
+    effects,
+    manualOverride: effectsManual,
+    onSlow: () => {
+      setEffects(false);
+      setEffectsAutoOff(true);
+      flash("Effects turned off to keep playback smooth · E to turn back on", 4000);
+    },
+  });
 
   /** S: save / unsave what's playing (the playlist if one was opened) to the home page shelf. */
   const toggleSaved = async () => {
@@ -215,29 +228,43 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     flash(v ? "Music video" : "Song");
   };
 
-  // Lay the iframe exactly over the media box, invisible unless there's a video to show (kept full
-  // size so YouTube streams a sensible quality). The iframe can't be re-parented without reloading,
-  // so it stays put and just follows the box's rect.
+  // Where the YouTube iframe sits. Without a video to show it's parked small and invisible, so
+  // YouTube streams a tiny picture instead of decoding HD nobody sees. In video mode it's laid
+  // exactly over the media box (the iframe can't be re-parented without reloading, so it follows
+  // the box's rect), writing styles only when the box actually moves.
   useEffect(() => {
     const mount = mountRef.current;
     if (!mount) return;
+    if (!showVideo) {
+      Object.assign(mount.style, { left: "0px", top: "0px", width: "256px", height: "144px", opacity: "0" });
+      return;
+    }
     let raf = 0;
+    let last = "";
     const follow = () => {
       const box = mediaRef.current?.getBoundingClientRect();
       if (box) {
-        Object.assign(mount.style, {
-          left: `${box.left}px`,
-          top: `${box.top}px`,
-          width: `${box.width}px`,
-          height: `${box.height}px`,
-          opacity: videoVisibleRef.current ? "1" : "0",
-        });
+        const key = `${box.left}|${box.top}|${box.width}|${box.height}`;
+        if (key !== last) {
+          last = key;
+          Object.assign(mount.style, {
+            left: `${box.left}px`,
+            top: `${box.top}px`,
+            width: `${box.width}px`,
+            height: `${box.height}px`,
+          });
+        }
       }
       raf = requestAnimationFrame(follow);
     };
     raf = requestAnimationFrame(follow);
     return () => cancelAnimationFrame(raf);
-  }, []);
+  }, [showVideo]);
+
+  useEffect(() => {
+    const mount = mountRef.current;
+    if (mount) mount.style.opacity = showVideo && videoVisible ? "1" : "0";
+  }, [showVideo, videoVisible]);
 
   useMediaSession({ controls, song, artwork, status: snap.status, duration: snap.duration, clock });
 
@@ -362,7 +389,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
           <button
             onClick={openSearch}
             aria-label="Search"
-            className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 backdrop-blur-xl transition hover:bg-white/20 hover:text-white"
+            className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
           >
             <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.4">
               <circle cx="11" cy="11" r="7" />
@@ -391,7 +418,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
         {toast && (
           <motion.div
             key={toast.id}
-            className="fixed left-1/2 top-8 z-30 -translate-x-1/2 rounded-full bg-black/50 px-5 py-2 text-sm font-semibold backdrop-blur-xl"
+            className="fixed left-1/2 top-8 z-30 -translate-x-1/2 rounded-full bg-neutral-900/80 px-5 py-2 text-sm font-semibold shadow-xl ring-1 ring-white/10"
             initial={{ opacity: 0, y: -8 }}
             animate={{ opacity: 1, y: 0 }}
             exit={{ opacity: 0 }}
@@ -402,7 +429,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
         {snap.status === "paused" && (
           <motion.div
             key="paused"
-            className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/40 px-5 py-2 text-sm font-semibold tracking-wide text-white/80 backdrop-blur-xl"
+            className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full bg-neutral-900/75 px-5 py-2 text-sm font-semibold tracking-wide text-white/80 shadow-xl ring-1 ring-white/10"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0 }}
@@ -416,7 +443,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
         {(snap.status === "needs-gesture" || snap.status === "error" || snap.status === "loading") && (
           <motion.div
             key="overlay"
-            className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-black/50 px-6 text-center backdrop-blur-md"
+            className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-black/70 px-6 text-center"
             initial={{ opacity: 0 }}
             animate={{ opacity: 1 }}
             exit={{ opacity: 0, transition: { duration: 0.8 } }}

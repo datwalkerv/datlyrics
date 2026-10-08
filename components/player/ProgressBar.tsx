@@ -22,15 +22,19 @@ export function ProgressBar({
   const seconds = useClock(clock, (t) => Math.floor(t));
 
   // Position is driven straight from the rAF clock to stay smooth without re-rendering every frame.
-  useEffect(
-    () =>
-      clock.subscribe(() => {
-        const p = dragRef.current ?? (duration > 0 ? Math.min(clock.getTime() / duration, 1) : 0);
-        if (fillRef.current) fillRef.current.style.width = `${p * 100}%`;
-        if (knobRef.current) knobRef.current.style.left = `${p * 100}%`;
-      }),
-    [clock, duration],
-  );
+  useEffect(() => {
+    let lastPx = -1;
+    return clock.subscribe(() => {
+      const p = dragRef.current ?? (duration > 0 ? Math.min(clock.getTime() / duration, 1) : 0);
+      // The bar moves a couple of pixels per second: only touch the DOM when that's visible,
+      // instead of every frame. Transforms only, so no layout either way.
+      const px = p * (trackRef.current?.clientWidth ?? 0);
+      if (Math.abs(px - lastPx) < 0.5 && dragRef.current === null) return;
+      lastPx = px;
+      if (fillRef.current) fillRef.current.style.transform = `scaleX(${p})`;
+      if (knobRef.current) knobRef.current.style.transform = `translateX(${p * 100}%)`;
+    });
+  }, [clock, duration, drag]);
 
   const ratioAt = (clientX: number) => {
     const r = trackRef.current!.getBoundingClientRect();
@@ -74,14 +78,16 @@ export function ProgressBar({
             drag !== null ? "h-[6px]" : "h-[4px] group-hover:h-[6px]"
           }`}
         >
-          <div ref={fillRef} className="absolute inset-y-0 left-0 w-0 rounded-full bg-white" />
+          <div ref={fillRef} className="absolute inset-0 origin-left rounded-full bg-white" style={{ transform: "scaleX(0)" }} />
         </div>
-        <div
-          ref={knobRef}
-          className={`pointer-events-none absolute top-1/2 left-0 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md transition-opacity duration-200 ${
-            drag !== null ? "opacity-100" : "opacity-0 group-hover:opacity-100"
-          }`}
-        />
+        {/* Full-width rail moved by translateX(progress %), so the knob rides along without layout. */}
+        <div ref={knobRef} className="pointer-events-none absolute inset-0">
+          <div
+            className={`absolute top-1/2 left-0 size-3.5 -translate-x-1/2 -translate-y-1/2 rounded-full bg-white shadow-md transition-opacity duration-200 ${
+              drag !== null ? "opacity-100" : "opacity-0 group-hover:opacity-100"
+            }`}
+          />
+        </div>
       </div>
       <div className="mt-2 flex justify-between text-sm font-medium tabular-nums text-white/55">
         <span>{formatTime(drag !== null ? drag * duration : seconds)}</span>

@@ -57,7 +57,7 @@ const ERRORS: Record<number, string> = {
   150: "The owner doesn't allow this video to be played outside YouTube.",
 };
 
-/** A requestAnimationFrame-driven clock that smooths the player's coarse currentTime. */
+/** A clock that smooths the player's coarse currentTime between its updates (ticks ~20×/s). */
 export type PlayerClock = {
   subscribe: (fn: () => void) => () => void;
   getTime: () => number;
@@ -74,11 +74,17 @@ function createClock(
   statusRef: React.RefObject<PlayerStatus>,
 ): PlayerClock {
   const listeners = new Set<() => void>();
-  let raf = 0;
+  // A ~20 Hz timer, not requestAnimationFrame: nothing driven by it needs 60 Hz (line changes,
+  // a bar moving 2px/s, interlude dots), and an rAF loop would make the page render — and the
+  // GPU composite — a frame every vsync even when nothing on screen changed.
+  const INTERVAL_MS = 50;
+  let timer: ReturnType<typeof setInterval> | undefined;
   let lastRaw = -1;
   let lastAt = 0;
   let t = 0;
-  const tick = (now: number) => {
+  let notified = -1;
+  const tick = () => {
+    const now = performance.now();
     const p = playerRef.current;
     if (p && typeof p.getCurrentTime === "function") {
       const raw = p.getCurrentTime() || 0;
@@ -95,16 +101,20 @@ function createClock(
       }
       t = next;
     }
-    listeners.forEach((fn) => fn());
-    raf = requestAnimationFrame(tick);
+    // Only wake subscribers when time moved (paused = nothing to redraw); seeks still come through.
+    if (t !== notified) {
+      notified = t;
+      listeners.forEach((fn) => fn());
+    }
   };
   return {
     subscribe(fn) {
       listeners.add(fn);
-      if (listeners.size === 1) raf = requestAnimationFrame(tick);
+      notified = -1; // a new subscriber gets the current time on the next frame
+      if (listeners.size === 1) timer = setInterval(tick, INTERVAL_MS);
       return () => {
         listeners.delete(fn);
-        if (!listeners.size) cancelAnimationFrame(raf);
+        if (!listeners.size) clearInterval(timer);
       };
     },
     getTime: () => t,

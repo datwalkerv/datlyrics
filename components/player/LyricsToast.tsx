@@ -15,7 +15,7 @@ export function LyricsToast({ message }: { message: string }) {
     <AnimatePresence>
       {visible && (
         <motion.div
-          className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full bg-black/45 px-5 py-2.5 text-sm font-semibold text-white/85 shadow-xl ring-1 ring-white/10 backdrop-blur-xl"
+          className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full bg-neutral-900/80 px-5 py-2.5 text-sm font-semibold text-white/85 shadow-xl ring-1 ring-white/10"
           initial={{ opacity: 0, y: 12 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: 8 }}

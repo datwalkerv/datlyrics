@@ -8,9 +8,13 @@ export function PlainLyrics({ text, clock, duration }: { text: string; clock: Pl
   const ref = useRef<HTMLDivElement>(null);
   const userScrolledAt = useRef(0);
 
+  // Its own frame loop (the shared clock ticks only ~20×/s): the slow glide should be smooth.
+  // Runs only while unsynced lyrics are on screen.
   useEffect(() => {
     let current = -1;
-    return clock.subscribe(() => {
+    let raf = 0;
+    const step = () => {
+      raf = requestAnimationFrame(step);
       const el = ref.current;
       if (!el || duration <= 0) return;
       // Let a manual scroll win for a few seconds before resuming.
@@ -23,9 +27,13 @@ export function PlainLyrics({ text, clock, duration }: { text: string; clock: Pl
       const p = Math.min(Math.max((clock.getTime() / duration - 0.06) / 0.86, 0), 1);
       const target = p * max;
       if (current < 0) current = el.scrollTop;
-      current += (target - current) * 0.04;
+      const next = current + (target - current) * 0.04;
+      if (Math.abs(next - current) < 0.05) return; // settled (e.g. paused): nothing to draw
+      current = next;
       el.scrollTop = current;
-    });
+    };
+    raf = requestAnimationFrame(step);
+    return () => cancelAnimationFrame(raf);
   }, [clock, duration]);
 
   return (

@@ -35,7 +35,7 @@ export function UpNext({ nextId, clock, duration }: { nextId: string | null; clo
     <AnimatePresence>
       {show && ready && (
         <motion.div
-          className="fixed bottom-[clamp(1.25rem,4vh,3rem)] right-[clamp(1.25rem,4vw,4rem)] z-20 flex max-w-[min(26rem,80vw)] items-center gap-4 rounded-2xl bg-black/35 p-3 pr-6 shadow-2xl ring-1 ring-white/10 backdrop-blur-xl"
+          className="fixed bottom-[clamp(1.25rem,4vh,3rem)] right-[clamp(1.25rem,4vw,4rem)] z-20 flex max-w-[min(26rem,80vw)] items-center gap-4 rounded-2xl bg-neutral-900/75 p-3 pr-6 shadow-2xl ring-1 ring-white/10"
           initial={{ opacity: 0, y: 24, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16 }}

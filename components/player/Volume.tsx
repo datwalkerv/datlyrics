@@ -80,7 +80,7 @@ export function VolumeHud({ volume, show }: { volume: number; show: boolean }) {
     <AnimatePresence>
       {show && (
         <motion.div
-          className="pointer-events-none fixed left-1/2 top-8 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-black/45 px-4 py-2.5 text-white/90 shadow-xl ring-1 ring-white/10 backdrop-blur-xl"
+          className="pointer-events-none fixed left-1/2 top-8 z-30 flex -translate-x-1/2 items-center gap-3 rounded-full bg-neutral-900/80 px-4 py-2.5 text-white/90 shadow-xl ring-1 ring-white/10"
           initial={{ opacity: 0, y: -8 }}
           animate={{ opacity: 1, y: 0 }}
           exit={{ opacity: 0, y: -6 }}

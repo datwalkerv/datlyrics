@@ -36,7 +36,7 @@ export function Queue({
       }}
     >
       <motion.aside
-        className="cursor-show absolute inset-y-0 right-0 flex w-[min(28rem,92vw)] flex-col bg-black/45 shadow-[-40px_0_120px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10 backdrop-blur-2xl"
+        className="cursor-show absolute inset-y-0 right-0 flex w-[min(28rem,92vw)] flex-col bg-neutral-950/85 shadow-[-40px_0_120px_-20px_rgba(0,0,0,0.6)] ring-1 ring-white/10"
         initial={{ x: "100%" }}
         animate={{ x: 0 }}
         exit={{ x: "100%" }}
@@ -116,7 +116,7 @@ function QueueRow({
         {/* eslint-disable-next-line @next/next/no-img-element */}
         <img src={`https://i.ytimg.com/vi/${id}/mqdefault.jpg`} alt="" loading="lazy" className="h-full w-full object-cover" />
         {active && (
-          <div className="absolute inset-0 flex items-end justify-center gap-[3px] bg-black/45 pb-3">
+          <div className="absolute inset-0 flex items-end justify-center gap-[3px] bg-neutral-950/85 pb-3">
             {[0, 1, 2].map((b) => (
               <span
                 key={b}

@@ -13,9 +13,11 @@ const CLICKABLE = 'a, button, [role="slider"], [data-clickable]';
 export function TorchCursor({ active }: { active: boolean }) {
   const ref = useRef<HTMLDivElement>(null);
   const activeRef = useRef(active);
+  const wakeRef = useRef<() => void>(() => {});
 
   useEffect(() => {
     activeRef.current = active;
+    wakeRef.current(); // fade in/out even if the loop was asleep
   }, [active]);
 
   useEffect(() => {
@@ -44,6 +46,7 @@ export function TorchCursor({ active }: { active: boolean }) {
       el.dataset.hover = String(!!target?.closest(CLICKABLE));
       // Where the real cursor shows (progress bar, search, queue), the torch steps aside.
       overZone = !!target?.closest(".cursor-show");
+      wake();
     };
     const onDown = () => (el.dataset.press = "true");
     const onUp = () => (el.dataset.press = "false");
@@ -73,9 +76,21 @@ export function TorchCursor({ active }: { active: boolean }) {
       const target = 1 + Math.min(speed / 4000, 0.12);
       swell += (target - swell) * Math.min(dt * 4, 1);
       el.style.transform = `translate3d(${x}px, ${y}px, 0) scale(${swell.toFixed(4)})`;
-      el.style.opacity = seen && activeRef.current && !overZone ? "1" : "0";
+      const visible = seen && activeRef.current && !overZone;
+      el.style.opacity = visible ? "1" : "0";
+      // Settled: stop the loop until the mouse moves (or the torch fades) again.
+      if (Math.abs(tx - x) < 0.3 && Math.abs(ty - y) < 0.3 && speed < 1 && Math.abs(swell - 1) < 0.002) {
+        raf = 0;
+        return;
+      }
       raf = requestAnimationFrame(tick);
     };
+    const wake = () => {
+      if (raf) return;
+      last = performance.now();
+      raf = requestAnimationFrame(tick);
+    };
+    wakeRef.current = wake;
 
     window.addEventListener("pointermove", onMove, { passive: true });
     window.addEventListener("pointerdown", onDown, { passive: true });
@@ -86,6 +101,7 @@ export function TorchCursor({ active }: { active: boolean }) {
       window.removeEventListener("pointerdown", onDown);
       window.removeEventListener("pointerup", onUp);
       cancelAnimationFrame(raf);
+      raf = 0;
     };
   }, []);
 
