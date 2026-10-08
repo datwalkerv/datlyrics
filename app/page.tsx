@@ -1,9 +1,10 @@
 import { GITHUB_URL } from "@/lib/site";
 import { HomeSearch } from "./HomeSearch";
+import { SavedShelf } from "./SavedShelf";
 
 export default function Home() {
   return (
-    <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-hidden bg-neutral-950 px-5 text-white">
+    <main className="relative flex min-h-dvh flex-col items-center justify-center overflow-x-hidden bg-neutral-950 px-5 py-20 text-white">
       <a
         href={GITHUB_URL}
         target="_blank"
@@ -25,6 +26,7 @@ export default function Home() {
         <p className="mt-16 text-sm text-white/35">
           Works with youtube.com, youtu.be and music.youtube.com links · Lyrics by LRCLIB
         </p>
+        <SavedShelf />
       </div>
     </main>
   );

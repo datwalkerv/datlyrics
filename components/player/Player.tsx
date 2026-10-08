@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
+import { isSaved, removeItem, resolveSaved, saveItem } from "@/lib/saved";
 import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
@@ -103,6 +104,29 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     flash(`Lyrics offset ${v > 0 ? "+" : ""}${v.toFixed(2)}s`);
   };
 
+  /** S: save / unsave what's playing (the playlist if one was opened) to the home page shelf. */
+  const toggleSaved = async () => {
+    if (listId) {
+      if (isSaved("playlist", listId)) {
+        removeItem("playlist", listId);
+        return flash("Removed playlist from saved");
+      }
+      try {
+        flash(saveItem(await resolveSaved({ listId })) ? "Playlist saved" : "Saved list is full");
+      } catch {
+        flash("Couldn't save this playlist");
+      }
+      return;
+    }
+    if (!original || !song) return;
+    if (isSaved("song", original)) {
+      removeItem("song", original);
+      return flash("Removed from saved");
+    }
+    const ok = saveItem({ kind: "song", id: original, title: song.title, subtitle: song.artist, image: artwork });
+    flash(ok ? "Saved" : "Saved list is full");
+  };
+
   /** YouTube Music's Song/Video switch: swap to the other upload, continuing at the same point in the song. */
   const toggleVideo = async () => {
     const v = !videoMode;
@@ -169,6 +193,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
     p: () => controls.prev(),
     f: () => toggleFullscreen(),
     v: () => toggleVideo(),
+    s: () => toggleSaved(),
     q: () => hasQueue && setQueueOpen((o) => !o),
     "[": () => adjustOffset(-0.25),
     "]": () => adjustOffset(0.25),
@@ -262,7 +287,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
         </Link>
         <div className="flex items-center gap-5">
           <p className="text-xs font-medium text-white/40 max-md:hidden">
-            ⌘K search ·{hasQueue ? " Q queue ·" : ""} Space play/pause · ←/→ seek · N/P next/prev · [ ] offset · V video · F fullscreen
+            ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · Space play/pause · ←/→ seek · N/P next/prev · [ ] offset · V video · F fullscreen
           </p>
           <button
             onClick={openSearch}
