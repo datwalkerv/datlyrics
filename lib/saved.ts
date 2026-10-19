@@ -14,6 +14,11 @@ export type SavedItem = {
   savedAt: number;
 };
 
+/** Shown first on everyone's shelf; can't be removed and don't count toward the limit. */
+export const PINNED: Pick<SavedItem, "kind" | "id">[] = [{ kind: "playlist", id: "PL1hXJKCgMGgiKJCQnpWtaBJT_kYDn3E7D" }];
+
+export const isPinned = (kind: SavedItem["kind"], id: string) => PINNED.some((x) => x.kind === kind && x.id === id);
+
 const KEY = "datlyrics:saved";
 const EVENT = "datlyrics:saved-change";
 const MAX = 24;
@@ -69,6 +74,7 @@ export const isSaved = (kind: SavedItem["kind"], id: string) => read().some((x) 
  * Re-saving an existing item just refreshes it in place. Returns false when the shelf is full.
  */
 export function saveItem(item: Omit<SavedItem, "savedAt">): boolean {
+  if (isPinned(item.kind, item.id)) return true;
   const items = read();
   if (items.some((x) => x.kind === item.kind && x.id === item.id)) {
     updateItem(item);

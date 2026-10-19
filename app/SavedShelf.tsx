@@ -5,7 +5,9 @@ import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
 import {
+  PINNED,
   SAVED_LIMIT,
+  isPinned,
   refreshPlaylistCover,
   removeItem,
   resolveSaved,
@@ -17,7 +19,9 @@ import {
 
 /** Saved songs and playlists (kept in localStorage) as one-click cards. */
 export function SavedShelf() {
-  const items = useSaved();
+  const pinned = usePinned();
+  // A pinned item the user also saved shows once, as the pinned card.
+  const items = useSaved().filter((x) => !isPinned(x.kind, x.id));
   const router = useRouter();
 
   // Playlists saved before covers were fetched show their first video instead; upgrade them once.
@@ -30,6 +34,9 @@ export function SavedShelf() {
   return (
     <section className="mt-12 w-full max-w-3xl" aria-label="Saved songs and playlists">
       <div className="flex flex-wrap justify-center gap-4">
+        {pinned.map((item) => (
+          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} pinned onPlay={() => router.push(savedHref(item))} />
+        ))}
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <motion.div
@@ -50,7 +57,26 @@ export function SavedShelf() {
   );
 }
 
-function SavedCard({ item, onPlay }: { item: SavedItem; onPlay: () => void }) {
+/** The pinned items' cards, fetched fresh each visit (titles change, cover URLs expire). */
+function usePinned(): SavedItem[] {
+  const [items, setItems] = useState<SavedItem[]>([]);
+  useEffect(() => {
+    let alive = true;
+    Promise.all(
+      PINNED.map((p) =>
+        resolveSaved(p.kind === "playlist" ? { listId: p.id } : { videoId: p.id })
+          .then((item) => ({ ...item, savedAt: 0 }))
+          .catch(() => null),
+      ),
+    ).then((list) => alive && setItems(list.filter((x) => x !== null)));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return items;
+}
+
+function SavedCard({ item, pinned = false, onPlay }: { item: SavedItem; pinned?: boolean; onPlay: () => void }) {
   return (
     <div className="group relative w-28 text-left">
       <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`}>
@@ -79,15 +105,17 @@ function SavedCard({ item, onPlay }: { item: SavedItem; onPlay: () => void }) {
         <p className="mt-2 truncate text-sm font-semibold text-white/90">{item.title}</p>
         <p className="truncate text-xs text-white/45">{item.subtitle}</p>
       </button>
-      <button
-        onClick={() => removeItem(item.kind, item.id)}
-        aria-label={`Remove ${item.title}`}
-        className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-neutral-800 text-white/70 opacity-0 ring-1 ring-white/15 transition hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
-      >
-        <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
-          <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
-        </svg>
-      </button>
+      {!pinned && (
+        <button
+          onClick={() => removeItem(item.kind, item.id)}
+          aria-label={`Remove ${item.title}`}
+          className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-neutral-800 text-white/70 opacity-0 ring-1 ring-white/15 transition hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
+        >
+          <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
+            <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />
+          </svg>
+        </button>
+      )}
     </div>
   );
 }

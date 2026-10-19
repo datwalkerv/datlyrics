@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
-import { isSaved, removeItem, resolveSaved, saveItem } from "@/lib/saved";
+import { isPinned, isSaved, removeItem, resolveSaved, saveItem } from "@/lib/saved";
 import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
@@ -177,6 +177,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
   /** S: save / unsave what's playing (the playlist if one was opened) to the home page shelf. */
   const toggleSaved = async () => {
     if (listId) {
+      if (isPinned("playlist", listId)) return flash("This playlist is pinned for everyone");
       if (isSaved("playlist", listId)) {
         removeItem("playlist", listId);
         return flash("Removed playlist from saved");
