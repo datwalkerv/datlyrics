@@ -147,6 +147,7 @@ export function useYouTubePlayer(
   const [snap, setSnap] = useState<PlayerSnapshot>(INITIAL);
   const statusRef = useRef<PlayerStatus>("loading");
   const volumeRef = useRef(initialVolume);
+  const loopRef = useRef(false);
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
   const loadedIdRef = useRef<string | null>(null);
@@ -377,7 +378,9 @@ export function useYouTubePlayer(
             }
             if (e.data === S.ENDED) {
               const i = indexRef.current;
-              if (i < queueRef.current.length - 1) playIndex(i + 1);
+              // Replay the slot (same path as next) so it wins over the embed's own advance.
+              if (loopRef.current) playIndex(i);
+              else if (i < queueRef.current.length - 1) playIndex(i + 1);
               else sync({ status: "ended" });
               return;
             }
@@ -499,6 +502,10 @@ export function useYouTubePlayer(
         p.setVolume(v);
         if (v === 0) p.mute();
         else p.unMute();
+      },
+      /** Repeat the current track instead of moving on when it ends. */
+      setLoop: (on: boolean) => {
+        loopRef.current = on;
       },
       getTime: () => playerRef.current?.getCurrentTime() ?? 0,
       next: () => playIndex(indexRef.current + 1),
