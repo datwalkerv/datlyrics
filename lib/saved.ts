@@ -3,6 +3,7 @@
 import { useSyncExternalStore } from "react";
 import { fetchArtwork, fetchVideoInfo } from "@/components/player/useTrackMeta";
 import { cleanTitle } from "./clean-title";
+import { DEMO_PLAYLIST_ID } from "./site";
 
 export type SavedItem = {
   kind: "song" | "playlist";
@@ -15,7 +16,7 @@ export type SavedItem = {
 };
 
 /** Shown first on everyone's shelf; can't be removed and don't count toward the limit. */
-export const PINNED: Pick<SavedItem, "kind" | "id">[] = [{ kind: "playlist", id: "PL1hXJKCgMGgiKJCQnpWtaBJT_kYDn3E7D" }];
+export const PINNED: Pick<SavedItem, "kind" | "id">[] = [{ kind: "playlist", id: DEMO_PLAYLIST_ID }];
 
 export const isPinned = (kind: SavedItem["kind"], id: string) => PINNED.some((x) => x.kind === kind && x.id === id);
 

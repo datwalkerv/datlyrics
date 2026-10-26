@@ -10,6 +10,8 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 
 </div>
 
+![datlyrics home page](./public/screens/landing.jpg)
+
 ## ✨ Key Features
 
 - **📺 Made for the Big Screen**: Blurred cover art fills the background, the cover and title sit on the left, and the lyrics play on the right. The cursor hides itself when you stop moving the mouse.
