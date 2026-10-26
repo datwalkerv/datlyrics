@@ -9,6 +9,7 @@ import { isPinned, isSaved, removeItem, resolveSaved, saveItem } from "@/lib/sav
 import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
+import { MiniPlayer } from "./MiniPlayer";
 import { NowPlaying } from "./NowPlaying";
 import { PlainLyrics } from "./PlainLyrics";
 import { Queue } from "./Queue";
@@ -57,7 +58,16 @@ function readVideoPref(): boolean {
   }
 }
 
-export function Player({ videoId, listId }: { videoId?: string; listId?: string }) {
+export function Player({
+  videoId,
+  listId,
+  minimized = false,
+}: {
+  videoId?: string;
+  listId?: string;
+  /** Out of sight while an artist page is open: keeps playing, shows a mini bar instead. */
+  minimized?: boolean;
+}) {
   const router = useRouter();
   const mountRef = useRef<HTMLDivElement>(null);
   const mediaRef = useRef<HTMLDivElement>(null);
@@ -96,7 +106,7 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
 
   const playing = snap.status === "playing" || snap.status === "buffering";
   const hasQueue = (snap.playlist?.length ?? 0) > 1;
-  const idle = useIdle(2500, playing && !queueOpen);
+  const idle = useIdle(2500, playing && !queueOpen && !minimized);
   const nextId = snap.playlist?.[snap.index + 1] ?? null;
   const trackKey = `${snap.index}:${original ?? "none"}`;
   const offset = offsetState.id === snap.videoId ? offsetState.value : 0;
@@ -279,7 +289,8 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
 
   useMediaSession({ controls, song, artwork, status: snap.status, duration: snap.duration, clock });
 
-  useKeyboard({
+  // The artist page has the keyboard while minimized (media keys still work via the Media Session).
+  useKeyboard(minimized ? {} : {
     // Media keys, for browsers that deliver them to the page as key presses.
     MediaPlayPause: () => controls.toggle(),
     MediaTrackNext: () => controls.next(),
@@ -331,161 +342,177 @@ export function Player({ videoId, listId }: { videoId?: string; listId?: string 
   const centered = noLyricsMessage !== null;
 
   return (
-    <main className={`cursor-hidden relative isolate h-dvh w-full overflow-hidden text-white ${idle ? "cursor-idle" : ""}`}>
-      {/* The cursor is hidden on the player; the torch is the cursor, lighting the backdrop under the lyrics. */}
-      <Backdrop src={artwork} animated={effects}>
-        <TorchCursor active={!idle} />
-      </Backdrop>
-
-      {/* The real YouTube player: kept rendered (not display:none) so playback isn't throttled, but invisible. */}
-      <div
-        ref={mountRef}
-        aria-hidden
-        className="yt-mount pointer-events-none fixed -left-[9999px] top-0 z-10 size-px overflow-hidden rounded-[clamp(10px,1vw,20px)] opacity-0 transition-opacity duration-500"
-      />
-
-      <div
-        className={`grid h-full items-center px-[6vw] py-[8vh] max-md:px-5 max-md:py-6 ${
-          centered
-            ? "grid-cols-1 justify-items-center"
-            : "grid-cols-[minmax(0,40fr)_minmax(0,60fr)] gap-[8vw] max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)] max-md:gap-6"
+    <>
+      <main
+        inert={minimized}
+        className={`cursor-hidden isolate h-dvh w-full overflow-hidden text-white ${idle ? "cursor-idle" : ""} ${
+          minimized ? "pointer-events-none fixed inset-0 -z-10 opacity-0" : "relative"
         }`}
       >
-        <div className={`flex w-full justify-center ${centered ? "" : "md:justify-end"}`}>
-          <NowPlaying
-            trackKey={trackKey}
-            song={song}
-            artwork={artwork}
-            clock={clock}
-            duration={snap.duration}
-            onSeek={controls.seekTo}
-            videoMode={showVideo}
-            mediaRef={mediaRef}
-          />
-        </div>
-        {!centered && (
-          <div className="h-full min-h-0">
-            <AnimatePresence mode="wait">
-              <motion.div
-                key={`${trackKey}:${lyrics.status}`}
-                className="h-full"
-                initial={{ opacity: 0 }}
-                animate={{ opacity: 1 }}
-                exit={{ opacity: 0 }}
-                transition={{ duration: 0.5 }}
-              >
-                {lyricsView}
-              </motion.div>
-            </AnimatePresence>
+        {/* The cursor is hidden on the player; the torch is the cursor, lighting the backdrop under the lyrics. */}
+        <Backdrop src={artwork} animated={effects && !minimized}>
+          <TorchCursor active={!idle && !minimized} />
+        </Backdrop>
+
+        {/* The real YouTube player: kept rendered (not display:none) so playback isn't throttled, but invisible. */}
+        <div
+          ref={mountRef}
+          aria-hidden
+          className="yt-mount pointer-events-none fixed -left-[9999px] top-0 z-10 size-px overflow-hidden rounded-[clamp(10px,1vw,20px)] opacity-0 transition-opacity duration-500"
+        />
+
+        <div
+          className={`grid h-full items-center px-[6vw] py-[8vh] max-md:px-5 max-md:py-6 ${
+            centered
+              ? "grid-cols-1 justify-items-center"
+              : "grid-cols-[minmax(0,40fr)_minmax(0,60fr)] gap-[8vw] max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)] max-md:gap-6"
+          }`}
+        >
+          <div className={`flex w-full justify-center ${centered ? "" : "md:justify-end"}`}>
+            <NowPlaying
+              trackKey={trackKey}
+              song={song}
+              artwork={artwork}
+              clock={clock}
+              duration={snap.duration}
+              onSeek={controls.seekTo}
+              videoMode={showVideo}
+              mediaRef={mediaRef}
+            />
           </div>
-        )}
-      </div>
-
-      {noLyricsMessage && <LyricsToast key={`${trackKey}:${noLyricsMessage}`} message={noLyricsMessage} />}
-
-      {/* Subtle chrome that appears while the mouse moves. */}
-      <div
-        className={`fixed inset-x-0 top-0 z-20 flex items-center justify-between px-[clamp(1.25rem,3vw,3rem)] py-5 transition-opacity duration-700 ${
-          idle ? "pointer-events-none opacity-0" : "opacity-100"
-        }`}
-      >
-        <Link href="/" className="pointer-events-auto text-lg font-bold tracking-tight text-white/70 hover:text-white">
-          datlyrics
-        </Link>
-        <div className="flex items-center gap-5">
-          <p className="text-xs font-medium text-white/40 max-md:hidden">
-            ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · L loop · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
-          </p>
-          <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
-          <button
-            onClick={openSearch}
-            aria-label="Search"
-            className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
-          >
-            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.4">
-              <circle cx="11" cy="11" r="7" />
-              <path d="m20 20-3.5-3.5" strokeLinecap="round" />
-            </svg>
-          </button>
-        </div>
-      </div>
-
-      <VolumeHud volume={volume} show={volumeHud !== null} />
-
-      {listId && !queueOpen && <UpNext nextId={nextId} clock={clock} duration={snap.duration} />}
-
-      <AnimatePresence>
-        {queueOpen && snap.playlist && (
-          <Queue
-            ids={snap.playlist}
-            current={snap.index}
-            onPick={(i) => controls.playAt(i)}
-            onClose={() => setQueueOpen(false)}
-          />
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {toast && (
-          <motion.div
-            key={toast.id}
-            className="fixed left-1/2 top-8 z-30 -translate-x-1/2 rounded-full bg-neutral-900/80 px-5 py-2 text-sm font-semibold shadow-xl ring-1 ring-white/10"
-            initial={{ opacity: 0, y: -8 }}
-            animate={{ opacity: 1, y: 0 }}
-            exit={{ opacity: 0 }}
-          >
-            {toast.text}
-          </motion.div>
-        )}
-        {snap.status === "paused" && (
-          <motion.div
-            key="paused"
-            className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full bg-neutral-900/75 px-5 py-2 text-sm font-semibold tracking-wide text-white/80 shadow-xl ring-1 ring-white/10"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0 }}
-          >
-            Paused
-          </motion.div>
-        )}
-      </AnimatePresence>
-
-      <AnimatePresence>
-        {(snap.status === "needs-gesture" || snap.status === "error" || snap.status === "loading") && (
-          <motion.div
-            key="overlay"
-            className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-black/70 px-6 text-center"
-            initial={{ opacity: 0 }}
-            animate={{ opacity: 1 }}
-            exit={{ opacity: 0, transition: { duration: 0.8 } }}
-          >
-            {snap.status === "loading" && <div className="size-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />}
-            {snap.status === "needs-gesture" && (
-              <>
-                <button
-                  onClick={start}
-                  autoFocus
-                  className="flex size-28 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-transform hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
-                  aria-label="Start playback"
+          {!centered && (
+            <div className="h-full min-h-0">
+              <AnimatePresence mode="wait">
+                <motion.div
+                  key={`${trackKey}:${lyrics.status}`}
+                  className="h-full"
+                  initial={{ opacity: 0 }}
+                  animate={{ opacity: 1 }}
+                  exit={{ opacity: 0 }}
+                  transition={{ duration: 0.5 }}
                 >
-                  <svg viewBox="0 0 24 24" className="size-12" fill="currentColor">
-                    <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" />
-                  </svg>
-                </button>
-                <p className="text-lg font-medium text-white/70">Press play to start{song ? ` · ${song.title}` : ""}</p>
-              </>
-            )}
-            {snap.status === "error" && (
-              <>
-                <p className="max-w-xl text-2xl font-bold">{snap.error}</p>
-                <Link href="/" className="rounded-full bg-white px-6 py-3 font-semibold text-black">
-                  Try another link
-                </Link>
-              </>
-            )}
-          </motion.div>
-        )}
-      </AnimatePresence>
-    </main>
+                  {lyricsView}
+                </motion.div>
+              </AnimatePresence>
+            </div>
+          )}
+        </div>
+
+        {noLyricsMessage && <LyricsToast key={`${trackKey}:${noLyricsMessage}`} message={noLyricsMessage} />}
+
+        {/* Subtle chrome that appears while the mouse moves. */}
+        <div
+          className={`fixed inset-x-0 top-0 z-20 flex items-center justify-between px-[clamp(1.25rem,3vw,3rem)] py-5 transition-opacity duration-700 ${
+            idle ? "pointer-events-none opacity-0" : "opacity-100"
+          }`}
+        >
+          <Link href="/" className="pointer-events-auto text-lg font-bold tracking-tight text-white/70 hover:text-white">
+            datlyrics
+          </Link>
+          <div className="flex items-center gap-5">
+            <p className="text-xs font-medium text-white/40 max-md:hidden">
+              ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · L loop · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
+            </p>
+            <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
+            <button
+              onClick={openSearch}
+              aria-label="Search"
+              className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
+            >
+              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.4">
+                <circle cx="11" cy="11" r="7" />
+                <path d="m20 20-3.5-3.5" strokeLinecap="round" />
+              </svg>
+            </button>
+          </div>
+        </div>
+
+        <VolumeHud volume={volume} show={volumeHud !== null} />
+
+        {listId && !queueOpen && <UpNext nextId={nextId} clock={clock} duration={snap.duration} />}
+
+        <AnimatePresence>
+          {queueOpen && snap.playlist && (
+            <Queue
+              ids={snap.playlist}
+              current={snap.index}
+              onPick={(i) => controls.playAt(i)}
+              onClose={() => setQueueOpen(false)}
+            />
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {toast && (
+            <motion.div
+              key={toast.id}
+              className="fixed left-1/2 top-8 z-30 -translate-x-1/2 rounded-full bg-neutral-900/80 px-5 py-2 text-sm font-semibold shadow-xl ring-1 ring-white/10"
+              initial={{ opacity: 0, y: -8 }}
+              animate={{ opacity: 1, y: 0 }}
+              exit={{ opacity: 0 }}
+            >
+              {toast.text}
+            </motion.div>
+          )}
+          {snap.status === "paused" && (
+            <motion.div
+              key="paused"
+              className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full bg-neutral-900/75 px-5 py-2 text-sm font-semibold tracking-wide text-white/80 shadow-xl ring-1 ring-white/10"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0 }}
+            >
+              Paused
+            </motion.div>
+          )}
+        </AnimatePresence>
+
+        <AnimatePresence>
+          {(snap.status === "needs-gesture" || snap.status === "error" || snap.status === "loading") && (
+            <motion.div
+              key="overlay"
+              className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-black/70 px-6 text-center"
+              initial={{ opacity: 0 }}
+              animate={{ opacity: 1 }}
+              exit={{ opacity: 0, transition: { duration: 0.8 } }}
+            >
+              {snap.status === "loading" && <div className="size-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />}
+              {snap.status === "needs-gesture" && (
+                <>
+                  <button
+                    onClick={start}
+                    autoFocus
+                    className="flex size-28 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-transform hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
+                    aria-label="Start playback"
+                  >
+                    <svg viewBox="0 0 24 24" className="size-12" fill="currentColor">
+                      <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" />
+                    </svg>
+                  </button>
+                  <p className="text-lg font-medium text-white/70">Press play to start{song ? ` · ${song.title}` : ""}</p>
+                </>
+              )}
+              {snap.status === "error" && (
+                <>
+                  <p className="max-w-xl text-2xl font-bold">{snap.error}</p>
+                  <Link href="/" className="rounded-full bg-white px-6 py-3 font-semibold text-black">
+                    Try another link
+                  </Link>
+                </>
+              )}
+            </motion.div>
+          )}
+        </AnimatePresence>
+      </main>
+      {minimized && (
+        <MiniPlayer
+          song={song}
+          artwork={artwork}
+          playing={playing}
+          onToggle={() => controls.toggle()}
+          href={`/play?${new URLSearchParams({ ...(videoId && { v: videoId }), ...(listId && { list: listId }) })}`}
+        />
+      )}
+    </>
   );
 }

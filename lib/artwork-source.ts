@@ -56,3 +56,23 @@ export async function findArtwork(artist: string, title: string): Promise<string
 
   return match?.artworkUrl100?.replace(/\/\d+x\d+bb\.(jpg|png)$/, "/1000x1000bb.$1") ?? null;
 }
+
+/** Square cover of an album, EP or single from the iTunes Search API, or null if none matched. */
+export async function findAlbumArtwork(artist: string, album: string): Promise<string | null> {
+  "use cache";
+  cacheLife("weeks");
+
+  const res = await fetch(
+    `https://itunes.apple.com/search?${new URLSearchParams({ term: `${artist} ${album}`, entity: "album", limit: "25" })}`,
+  );
+  if (!res.ok) throw new Error(`iTunes ${res.status}`);
+  const { results } = (await res.json()) as { results: { artistName: string; collectionName: string; artworkUrl100?: string }[] };
+
+  const a = norm(artist);
+  const t = norm(album);
+  // iTunes names singles and EPs "Title - Single" / "Title - EP".
+  const match =
+    results.find((r) => r.artworkUrl100 && norm(r.collectionName.replace(/ - (Single|EP)$/, "")) === t && norm(r.artistName).includes(a)) ??
+    results.find((r) => r.artworkUrl100 && norm(r.collectionName).includes(t) && norm(r.artistName).includes(a));
+  return match?.artworkUrl100?.replace(/\/\d+x\d+bb\.(jpg|png)$/, "/600x600bb.$1") ?? null;
+}

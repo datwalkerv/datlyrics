@@ -244,16 +244,21 @@ function createEngine(canvas: HTMLCanvasElement) {
     setCover(src: string) {
       const seq = ++loadSeq;
       const img = new Image();
+      // YouTube thumbnails without a max-res version 404, or come back as a 120x90 grey placeholder;
+      // fall back like CoverImage does, so the background shows the same picture as the cover.
+      const fallBack = () => {
+        if (!img.src.includes("maxresdefault")) return false;
+        img.src = src.replace("maxresdefault", "hqdefault");
+        return true;
+      };
       img.onload = () => {
         if (seq !== loadSeq) return;
+        if (img.naturalWidth <= 120 && fallBack()) return;
         for (const s of scenes) s.target = 0; // the previous cover fades out
         scenes.push({ ...makeSources(img), alpha: 0, target: 1 });
         wake();
       };
-      // YouTube thumbnails without a max-res version 404; fall back like CoverImage does.
-      img.onerror = () => {
-        if (src.includes("maxresdefault")) img.src = src.replace("maxresdefault", "hqdefault");
-      };
+      img.onerror = fallBack;
       img.src = src;
     },
     destroy() {

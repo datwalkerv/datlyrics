@@ -1,7 +1,8 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
-import type { SongInfo } from "@/lib/clean-title";
+import Link from "next/link";
+import { withoutFeat, type SongInfo } from "@/lib/clean-title";
 import { CoverImage } from "./CoverImage";
 import { ProgressBar } from "./ProgressBar";
 import type { PlayerClock } from "./useYouTubePlayer";
@@ -73,7 +74,16 @@ export function NowPlaying({
             {song?.title ?? " "}
           </h1>
           <p className="mt-1 truncate text-[clamp(1rem,1.5vw,1.6rem)] font-medium text-white/60">
-            {song?.artist || " "}
+            {song?.artist ? (
+              <Link
+                href={`/artist/${encodeURIComponent(withoutFeat(song.artist))}`}
+                className="cursor-show transition hover:text-white"
+              >
+                {song.artist}
+              </Link>
+            ) : (
+              " "
+            )}
           </p>
         </motion.div>
       </AnimatePresence>

@@ -22,6 +22,7 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 - **🖼️ Real Album Art**: Covers come from iTunes and prefer the original release over remixes, so you see the album cover, not a video still.
 - **💾 Saved Favorites**: Keep your favorite songs and playlists on the home page and start one with a single click. Press S while playing to save it, or paste a link into the + card. They're stored in your browser only.
 - **🌌 Living Background**: The blurred cover drifts and breathes while soft patches of it flow across the screen, with a wandering light and fine film grain. It's built to stay smooth on 4K TVs. Press E for a still background.
+- **🧑‍🎤 Artist Pages**: Click the artist name to see their top songs, albums and singles on a page you can share. The song keeps playing while you browse, and "Back to lyrics" takes you right back.
 - **📃 Queue & Up Next**: Press Q to open the queue and jump to any track. An "Up next" card shows up near the end of each song.
 - **⏯️ Seekable Progress Bar**: Click or drag the progress bar to seek.
 - **⌨️ Keyboard Only**: No buttons on screen. Everything has a shortcut.

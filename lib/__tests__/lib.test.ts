@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseArtist } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseYouTubeUrl } from "../parse-youtube-url";
@@ -78,4 +79,65 @@ describe("classifyUpload", () => {
     ["DJ Khaled ft. Drake - GREECE (Official Visualizer)", "DJKhaledVEVO", "video"],
     ["Hazetomika-BEVAGYALLVA", "csovi", "other"],
   ])("%s", (title, channel, kind) => expect(classifyUpload(title, channel)).toBe(kind));
+});
+
+describe("parseArtist", () => {
+  const runs = (...t: string[]) => ({ runs: t.map((text) => ({ text })) });
+  const thumbs = (url: string) => ({ thumbnails: [{ url: `${url}-small`, width: 60 }, { url, width: 544 }] });
+  const twoRow = (title: string, sub: string[], listId: string) => ({
+    musicTwoRowItemRenderer: {
+      title: runs(title),
+      subtitle: runs(...sub),
+      thumbnailRenderer: { musicThumbnailRenderer: { thumbnail: thumbs(`img:${title}`) } },
+      thumbnailOverlay: { content: { watchPlaylistEndpoint: { playlistId: listId } } },
+    },
+  });
+  // Trimmed from a real music.youtube.com artist `browse` response.
+  const response = {
+    header: { musicImmersiveHeaderRenderer: { title: runs("Don Toliver"), thumbnail: thumbs("banner") } },
+    contents: {
+      sectionListRenderer: {
+        contents: [
+          {
+            musicShelfRenderer: {
+              title: { runs: [{ text: "Top songs", navigationEndpoint: { browseEndpoint: { browseId: "VLOLAK5uy_songs" } } }] },
+              contents: [
+                {
+                  musicResponsiveListItemRenderer: {
+                    playlistItemData: { videoId: "KIXP--0-Tac" },
+                    flexColumns: ["No Pole", "Don Toliver", "100M plays", "Love Sick (Deluxe)"].map((t) => ({
+                      musicResponsiveListItemFlexColumnRenderer: { text: runs(t) },
+                    })),
+                  },
+                },
+                { musicResponsiveListItemRenderer: { flexColumns: [] } },
+              ],
+            },
+          },
+          { musicCarouselShelfRenderer: { header: { title: runs("Albums") }, contents: [twoRow("OCTANE", ["2026"], "OLAK5uy_octane")] } },
+          {
+            musicCarouselShelfRenderer: {
+              header: { title: runs("Singles & EPs") },
+              contents: [twoRow("CHOPTANE", ["EP", " • ", "2026"], "OLAK5uy_chop"), twoRow("No list", ["2020"], "PLnotanalbum")],
+            },
+          },
+        ],
+      },
+    },
+  };
+
+  it("reads the header, top songs, albums and singles", () => {
+    expect(parseArtist(response)).toEqual({
+      name: "Don Toliver",
+      image: "banner",
+      songs: [{ id: "KIXP--0-Tac", title: "No Pole", album: "Love Sick (Deluxe)", image: null }],
+      allSongsListId: "OLAK5uy_songs",
+      albums: [{ listId: "OLAK5uy_octane", title: "OCTANE", year: "2026", image: "img:OCTANE" }],
+      singles: [{ listId: "OLAK5uy_chop", title: "CHOPTANE", year: "2026", image: "img:CHOPTANE" }],
+    });
+  });
+
+  it("returns null without an artist header", () => {
+    expect(parseArtist({ contents: {} })).toBeNull();
+  });
 });
