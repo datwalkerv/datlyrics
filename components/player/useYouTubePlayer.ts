@@ -374,6 +374,8 @@ export function useYouTubePlayer(
               if (e.target.getVideoData?.().video_id === loadedIdRef.current) armedRef.current = true;
             } else if (embedIndex >= 0 && embedIndex !== embedSlotRef.current) {
               // The embed moved along its playlist by itself (media keys, or end of a track).
+              // On loop, that advance is the track ending: replay it instead of following.
+              if (loopRef.current) return playIndex(indexRef.current);
               follow(embedIndex);
             }
             if (e.data === S.ENDED) {
