@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 
-export type PlayerStatus = "loading" | "needs-gesture" | "playing" | "paused" | "buffering" | "ended" | "error";
+export type PlayerStatus = "loading" | "playing" | "paused" | "buffering" | "ended" | "error";
 
 export type PlayerSnapshot = {
   status: PlayerStatus;
@@ -341,9 +341,9 @@ export function useYouTubePlayer(
     const begin = (queue: string[], start: number) => {
       queueRef.current = queue;
       playIndex(start);
-      // Browsers block autoplay without a user gesture; fall back to a start screen.
+      // Browsers block autoplay without a user gesture; show it paused so play/Space starts it.
       gestureTimer = setTimeout(() => {
-        if (statusRef.current === "loading") sync({ status: "needs-gesture" });
+        if (statusRef.current === "loading") sync({ status: "paused" });
       }, 3500);
     };
 
@@ -396,8 +396,8 @@ export function useYouTubePlayer(
                   : e.data === S.BUFFERING
                     ? "buffering"
                     : undefined;
-            // Keep "needs-gesture"/"loading" sticky until playback actually starts.
-            if (status === "paused" && (statusRef.current === "needs-gesture" || statusRef.current === "loading")) {
+            // Keep "loading" sticky until playback actually starts.
+            if (status === "paused" && statusRef.current === "loading") {
               sync();
               return;
             }

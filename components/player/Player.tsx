@@ -318,11 +318,6 @@ export function Player({
     },
   });
 
-  const start = () => {
-    controls.play();
-    toggleFullscreen();
-  };
-
   let lyricsView: React.ReactNode = null;
   // When there's nothing to show, a toast says why and the player moves to the centre.
   let noLyricsMessage: string | null = null;
@@ -468,7 +463,7 @@ export function Player({
         </AnimatePresence>
 
         <AnimatePresence>
-          {(snap.status === "needs-gesture" || snap.status === "error" || snap.status === "loading") && (
+          {(snap.status === "error" || snap.status === "loading") && (
             <motion.div
               key="overlay"
               className="fixed inset-0 z-40 flex flex-col items-center justify-center gap-6 bg-black/70 px-6 text-center"
@@ -477,21 +472,6 @@ export function Player({
               exit={{ opacity: 0, transition: { duration: 0.8 } }}
             >
               {snap.status === "loading" && <div className="size-10 animate-spin rounded-full border-2 border-white/20 border-t-white" />}
-              {snap.status === "needs-gesture" && (
-                <>
-                  <button
-                    onClick={start}
-                    autoFocus
-                    className="flex size-28 items-center justify-center rounded-full bg-white text-black shadow-2xl transition-transform hover:scale-105 focus:outline-none focus-visible:ring-4 focus-visible:ring-white/40"
-                    aria-label="Start playback"
-                  >
-                    <svg viewBox="0 0 24 24" className="size-12" fill="currentColor">
-                      <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" />
-                    </svg>
-                  </button>
-                  <p className="text-lg font-medium text-white/70">Press play to start{song ? ` · ${song.title}` : ""}</p>
-                </>
-              )}
               {snap.status === "error" && (
                 <>
                   <p className="max-w-xl text-2xl font-bold">{snap.error}</p>
