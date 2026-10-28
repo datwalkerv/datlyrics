@@ -417,6 +417,16 @@ export function useYouTubePlayer(
                 ? Math.min(embedOffsetRef.current + embedIndex, queueRef.current.length - 1)
                 : indexRef.current;
             indexRef.current = i;
+            const original = queueRef.current[i];
+            const failed = embedIndex >= 0 ? embedListRef.current[embedIndex] : loadedIdRef.current;
+            if (original && failed && failed !== original) {
+              // The swapped-in song/video version won't play here: fall back to the track's own upload.
+              cachedVersion(original);
+              resolvedRef.current.set(original, original);
+              loadSeq.current++;
+              loadId(original, 0);
+              return;
+            }
             if (i < queueRef.current.length - 1) {
               // Skip unplayable entries in playlists.
               sync({ error: msg });
@@ -475,7 +485,7 @@ export function useYouTubePlayer(
       setSnap(INITIAL);
       statusRef.current = "loading";
     };
-  }, [mountRef, videoId, listId, sync, playIndex, follow]);
+  }, [mountRef, videoId, listId, sync, playIndex, follow, loadId, cachedVersion]);
 
   // The clock only reads the refs inside its rAF loop, never during render.
   // eslint-disable-next-line react-hooks/refs
