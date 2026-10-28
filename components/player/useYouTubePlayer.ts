@@ -363,7 +363,12 @@ export function useYouTubePlayer(
               return;
             }
             // Our lyrics replace YouTube's captions, which some videos switch on by default.
-            if (e.data === S.PLAYING) (e.target as YT.Player & { unloadModule?: (m: string) => void }).unloadModule?.("captions");
+            if (e.data === S.PLAYING) {
+              (e.target as YT.Player & { unloadModule?: (m: string) => void }).unloadModule?.("captions");
+              // Right after a track change the embed can still report the previous video's title/duration,
+              // and no further event fires to correct it; re-read once it has settled.
+              setTimeout(() => sync(), 1500);
+            }
             const status: PlayerStatus | undefined =
               e.data === S.PLAYING
                 ? "playing"
