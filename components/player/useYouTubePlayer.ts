@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { YouTubeBridge } from "./bridge";
 
 export type PlayerStatus = "loading" | "playing" | "paused" | "buffering" | "ended" | "error";
 
@@ -30,25 +31,6 @@ const INITIAL: PlayerSnapshot = {
   error: null,
 };
 
-let apiPromise: Promise<typeof YT> | null = null;
-
-function loadYouTubeApi(): Promise<typeof YT> {
-  if (apiPromise) return apiPromise;
-  apiPromise = new Promise((resolve) => {
-    if (window.YT?.Player) return resolve(window.YT);
-    const prev = window.onYouTubeIframeAPIReady;
-    window.onYouTubeIframeAPIReady = () => {
-      prev?.();
-      resolve(window.YT);
-    };
-    const s = document.createElement("script");
-    s.src = "https://www.youtube.com/iframe_api";
-    s.async = true;
-    document.head.appendChild(s);
-  });
-  return apiPromise;
-}
-
 const ERRORS: Record<number, string> = {
   2: "That link doesn't look like a valid video.",
   5: "This video can't be played in the browser player.",
@@ -62,12 +44,6 @@ export type PlayerClock = {
   subscribe: (fn: () => void) => () => void;
   getTime: () => number;
 };
-
-declare global {
-  interface Window {
-    onYouTubeIframeAPIReady?: () => void;
-  }
-}
 
 function createClock(
   playerRef: React.RefObject<YT.Player | null>,
@@ -347,7 +323,7 @@ export function useYouTubePlayer(
       }, 3500);
     };
 
-    loadYouTubeApi()
+    Promise.resolve(YouTubeBridge)
       .then((YTApi) => {
         if (cancelled) return;
         const playerVars: YT.PlayerVars = {
