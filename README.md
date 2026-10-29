@@ -35,11 +35,13 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 | `⌘K` / `Ctrl K` / `/` | Search, or paste a link |
 | `Space` / `K` | Play / pause |
 | `←` `→` | Seek 5 seconds |
-| `J` `L` | Seek 10 seconds |
+| `J` | Seek back 10 seconds |
+| `L` | Loop the current song on / off |
 | `↑` `↓` | Volume up / down |
 | `N` / `P` | Next / previous track |
 | `V` | Switch between song and music video |
 | `Q` | Open the queue (playlists) |
+| `R` | Shuffle on / off (playlists) |
 | `S` | Save / unsave the song or playlist to the home page |
 | `E` | Turn background effects on / off |
 | `[` `]` | Move the lyrics 0.25s earlier / later |

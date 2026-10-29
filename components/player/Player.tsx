@@ -77,6 +77,7 @@ export function Player({
   const [effectsManual, setEffectsManual] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [loop, setLoop] = useState(false);
+  const [shuffle, setShuffle] = useState(false);
   // Which upload each queue entry plays as: its song or its music video, per the current mode.
   const resolveFor = (want: "song" | "video"): ResolveVersion => (id) => pickVersion(id, want).then((v) => v.id);
   const resolveVersion = useRef<ResolveVersion>(resolveFor(readVideoPref() ? "video" : "song"));
@@ -192,6 +193,13 @@ export function Player({
     flash(v ? "Loop on" : "Loop off");
   };
 
+  const toggleShuffle = () => {
+    const v = !shuffle;
+    setShuffle(v);
+    controls.setShuffle(v);
+    flash(v ? "Shuffle on" : "Shuffle off");
+  };
+
   /** S: save / unsave what's playing (the playlist if one was opened) to the home page shelf. */
   const toggleSaved = async () => {
     if (listId) {
@@ -303,6 +311,7 @@ export function Player({
     ArrowRight: () => controls.seekBy(5),
     j: () => controls.seekBy(-10),
     l: () => toggleLoop(),
+    r: () => hasQueue && toggleShuffle(),
     n: () => controls.next(),
     p: () => controls.prev(),
     f: () => toggleFullscreen(),
@@ -406,7 +415,7 @@ export function Player({
           </Link>
           <div className="flex items-center gap-5">
             <p className="text-xs font-medium text-white/40 max-md:hidden">
-              ⌘K search ·{hasQueue ? " Q queue ·" : ""} S save · L loop · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
+              ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
             </p>
             <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
             <button

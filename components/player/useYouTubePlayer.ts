@@ -124,6 +124,9 @@ export function useYouTubePlayer(
   const statusRef = useRef<PlayerStatus>("loading");
   const volumeRef = useRef(initialVolume);
   const loopRef = useRef(false);
+  const shuffleRef = useRef(false);
+  // The playlist in its own order; queueRef holds it shuffled while shuffle is on.
+  const originalRef = useRef<string[]>([]);
   const queueRef = useRef<string[]>([]);
   const indexRef = useRef(0);
   const loadedIdRef = useRef<string | null>(null);
@@ -279,6 +282,29 @@ export function useYouTubePlayer(
     [adopt, cachedVersion, loadId, resolve],
   );
 
+  /** Put the queue in shuffled or playlist order, keeping the current track where it is. */
+  const reorder = useCallback(() => {
+    const i = indexRef.current;
+    const current = queueRef.current[i];
+    if (current === undefined) return;
+    let queue = originalRef.current;
+    if (shuffleRef.current) {
+      // Shuffle only turns on from playlist order, so i is the current track's spot in it.
+      const rest = queue.filter((_, k) => k !== i);
+      for (let k = rest.length - 1; k > 0; k--) {
+        const j = Math.floor(Math.random() * (k + 1));
+        [rest[k], rest[j]] = [rest[j], rest[k]];
+      }
+      queue = [current, ...rest];
+    }
+    queueRef.current = queue;
+    indexRef.current = Math.max(queue.indexOf(current), 0);
+    // The embed's playlist is in the old order: stop following it, the next track change reloads it.
+    embedListRef.current = [];
+    sync();
+    prefetchAround(indexRef.current);
+  }, [sync, prefetchAround]);
+
   const playIndex = useCallback(
     async (i: number) => {
       const queue = queueRef.current;
@@ -315,8 +341,11 @@ export function useYouTubePlayer(
     mount.appendChild(host);
 
     const begin = (queue: string[], start: number) => {
+      originalRef.current = queue;
       queueRef.current = queue;
-      playIndex(start);
+      indexRef.current = start;
+      if (shuffleRef.current) reorder();
+      playIndex(indexRef.current);
       // Browsers block autoplay without a user gesture; show it paused so play/Space starts it.
       gestureTimer = setTimeout(() => {
         if (statusRef.current === "loading") sync({ status: "paused" });
@@ -460,13 +489,14 @@ export function useYouTubePlayer(
       playerRef.current?.destroy();
       playerRef.current = null;
       queueRef.current = [];
+      originalRef.current = [];
       indexRef.current = 0;
       loadedIdRef.current = null;
       host.remove();
       setSnap(INITIAL);
       statusRef.current = "loading";
     };
-  }, [mountRef, videoId, listId, sync, playIndex, follow, loadId, cachedVersion]);
+  }, [mountRef, videoId, listId, sync, playIndex, follow, loadId, cachedVersion, reorder]);
 
   // The clock only reads the refs inside its rAF loop, never during render.
   // eslint-disable-next-line react-hooks/refs
@@ -500,6 +530,11 @@ export function useYouTubePlayer(
       setLoop: (on: boolean) => {
         loopRef.current = on;
       },
+      /** Play the rest of the queue in random order; off goes back to playlist order. */
+      setShuffle: (on: boolean) => {
+        shuffleRef.current = on;
+        reorder();
+      },
       getTime: () => playerRef.current?.getCurrentTime() ?? 0,
       next: () => playIndex(indexRef.current + 1),
       playAt: (i: number) => playIndex(i),
@@ -516,7 +551,7 @@ export function useYouTubePlayer(
         loadId(id, getStart());
       },
     }),
-    [playIndex, loadId],
+    [playIndex, loadId, reorder],
   );
 
   return { snap, clock, controls };
