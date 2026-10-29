@@ -7,6 +7,7 @@ import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
 import {
   PINNED,
   SAVED_LIMIT,
+  SAVED_LIST_ID,
   isPinned,
   refreshPlaylistCover,
   removeItem,
@@ -21,13 +22,23 @@ import {
 export function SavedShelf() {
   const pinned = usePinned();
   // A pinned item the user also saved shows once, as the pinned card.
-  const items = useSaved().filter((x) => !isPinned(x.kind, x.id));
+  const saved = useSaved();
+  const items = saved.filter((x) => x.kind === "playlist" && !isPinned(x.kind, x.id));
+  const songCount = saved.filter((x) => x.kind === "song").length;
+  const savedSongs: SavedItem = {
+    kind: "playlist",
+    id: SAVED_LIST_ID,
+    title: "Saved",
+    subtitle: `${songCount} song${songCount === 1 ? "" : "s"}`,
+    image: "/saved.svg",
+    savedAt: 0,
+  };
   const router = useRouter();
 
   // Playlists saved before covers were fetched show their first video instead; upgrade them once.
   useEffect(() => {
     for (const item of items) {
-      if (item.kind === "playlist" && !item.image?.includes("/pl_c/")) refreshPlaylistCover(item.id);
+      if (!item.image?.includes("/pl_c/")) refreshPlaylistCover(item.id);
     }
   }, [items]);
 
@@ -37,6 +48,7 @@ export function SavedShelf() {
         {pinned.map((item) => (
           <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} pinned onPlay={() => router.push(savedHref(item))} />
         ))}
+        {songCount > 0 && <SavedCard item={savedSongs} pinned onPlay={() => router.push(savedHref(savedSongs))} />}
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <motion.div
@@ -88,7 +100,7 @@ function SavedCard({ item, pinned = false, onPlay }: { item: SavedItem; pinned?:
               alt=""
               loading="lazy"
               className="h-full w-full object-cover"
-              onError={() => item.kind === "playlist" && refreshPlaylistCover(item.id)}
+              onError={() => item.kind === "playlist" && item.id !== SAVED_LIST_ID && refreshPlaylistCover(item.id)}
             />
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">

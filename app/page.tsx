@@ -39,7 +39,7 @@ const SHOWCASE = [
 const EXTRAS = [
   ["Real album art", "Covers come from iTunes and prefer the original release, so you see the album, not a video still."],
   ["Living background", "The blurred cover drifts and breathes behind the lyrics. Built to stay smooth on 4K TVs."],
-  ["Saved favorites", "Press S while playing to keep a song or playlist on the home page. Stored in your browser only."],
+  ["Saved favorites", "Press S while playing to add a song to your Saved playlist, or keep a whole playlist on the home page. Stored in your browser only."],
   ["Loop and shuffle", "Press L to keep one song on repeat, inside a playlist too. Press R to shuffle a playlist."],
   ["Keyboard only", "No buttons on screen and a cursor that hides itself. Everything has a shortcut."],
   ["No account", "No sign-up, no API keys, no cookies, no analytics."],

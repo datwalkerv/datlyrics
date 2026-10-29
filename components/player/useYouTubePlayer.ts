@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { SAVED_LIST_ID, savedSongIds } from "@/lib/saved";
 import { YouTubeBridge } from "./bridge";
 
 export type PlayerStatus = "loading" | "playing" | "paused" | "buffering" | "ended" | "error";
@@ -366,7 +367,7 @@ export function useYouTubePlayer(
           origin: window.location.origin,
         };
         // Cue (not play) the playlist just to read its track list.
-        if (listId) {
+        if (listId && listId !== SAVED_LIST_ID) {
           playerVars.listType = "playlist";
           playerVars.list = listId;
         }
@@ -455,6 +456,11 @@ export function useYouTubePlayer(
               e.target.setVolume(volumeRef.current);
               if (volumeRef.current === 0) e.target.mute();
               if (!listId) return begin([videoId!], 0);
+              if (listId === SAVED_LIST_ID) {
+                const ids = savedSongIds();
+                if (!ids.length) return sync({ status: "error", error: "No saved songs yet." });
+                return begin(ids, Math.max(0, videoId ? ids.indexOf(videoId) : 0));
+              }
               let tries = 0;
               listTimer = setInterval(() => {
                 const ids = e.target.getPlaylist?.();

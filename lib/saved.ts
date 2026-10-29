@@ -18,6 +18,9 @@ export type SavedItem = {
 /** Shown first on everyone's shelf; can't be removed and don't count toward the limit. */
 export const PINNED: Pick<SavedItem, "kind" | "id">[] = [{ kind: "playlist", id: DEMO_PLAYLIST_ID }];
 
+/** The user's own playlist of saved songs, played from localStorage instead of YouTube. */
+export const SAVED_LIST_ID = "saved";
+
 export const isPinned = (kind: SavedItem["kind"], id: string) => PINNED.some((x) => x.kind === kind && x.id === id);
 
 const KEY = "datlyrics:saved";
@@ -81,12 +84,15 @@ export function saveItem(item: Omit<SavedItem, "savedAt">): boolean {
     updateItem(item);
     return true;
   }
-  if (items.length >= MAX) return false;
+  // The cap is on shelf cards; songs all share the one Saved card.
+  if (item.kind === "playlist" && items.filter((x) => x.kind === "playlist").length >= MAX) return false;
   write([...items, { ...item, savedAt: Date.now() }]);
   return true;
 }
 
 export const SAVED_LIMIT = MAX;
+
+export const savedSongIds = () => read().filter((x) => x.kind === "song").map((x) => x.id);
 
 /** Replace a saved item's details in place, keeping its position. */
 export function updateItem(item: Omit<SavedItem, "savedAt">) {

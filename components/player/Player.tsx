@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
-import { isPinned, isSaved, removeItem, resolveSaved, saveItem } from "@/lib/saved";
+import { SAVED_LIST_ID, isPinned, isSaved, removeItem, resolveSaved, saveItem } from "@/lib/saved";
 import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
@@ -202,7 +202,8 @@ export function Player({
 
   /** S: save / unsave what's playing (the playlist if one was opened) to the home page shelf. */
   const toggleSaved = async () => {
-    if (listId) {
+    // Inside the Saved playlist, S (un)saves the current song.
+    if (listId && listId !== SAVED_LIST_ID) {
       if (isPinned("playlist", listId)) return flash("This playlist is pinned for everyone");
       if (isSaved("playlist", listId)) {
         removeItem("playlist", listId);
