@@ -370,9 +370,18 @@ export function useYouTubePlayer(
       if (shuffleRef.current) reorder();
       playIndex(indexRef.current);
       // Browsers block autoplay without a user gesture; show it paused so play/Space starts it.
-      gestureTimer = setTimeout(() => {
-        if (statusRef.current === "loading") sync({ status: "paused" });
-      }, 3500);
+      // Only judge that once the track is in the embed (the version lookup can take seconds),
+      // and nudge it once first in case the embed just didn't start.
+      const checkAutoplay = (nudged: boolean) => {
+        gestureTimer = setTimeout(() => {
+          if (statusRef.current !== "loading") return;
+          if (!loadedIdRef.current) return checkAutoplay(nudged);
+          if (nudged) return sync({ status: "paused" });
+          playerRef.current?.playVideo();
+          checkAutoplay(true);
+        }, 3500);
+      };
+      checkAutoplay(false);
     };
 
     Promise.resolve(YouTubeBridge)
