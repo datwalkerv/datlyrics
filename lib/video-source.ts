@@ -71,3 +71,33 @@ export async function getPlaylistInfo(id: string): Promise<PlaylistInfo | null> 
   const fallback = data.thumbnail_url?.replace("/hqdefault.jpg", "/mqdefault.jpg") ?? null;
   return { title: data.title, channel: data.author_name, thumbnail: cover ?? fallback };
 }
+
+/** Track ids in a YouTube Music `next` response (its radio queue), in order, without `seed`. */
+export function parseRadio(node: unknown, seed: string, out = new Set<string>()): string[] {
+  if (Array.isArray(node)) for (const x of node) parseRadio(x, seed, out);
+  else if (node && typeof node === "object") {
+    const o = node as Record<string, unknown>;
+    const id = (o.playlistPanelVideoRenderer as { videoId?: unknown } | undefined)?.videoId;
+    if (typeof id === "string" && id !== seed) out.add(id);
+    for (const v of Object.values(o)) parseRadio(v, seed, out);
+  }
+  return [...out];
+}
+
+/** Songs related to `id`: YouTube Music's radio for it, what it plays once your queue runs out. */
+export async function getRadio(id: string): Promise<string[]> {
+  "use cache";
+  cacheLife("hours");
+
+  const res = await fetch("https://music.youtube.com/youtubei/v1/next?prettyPrint=false", {
+    method: "POST",
+    headers: { "Content-Type": "application/json", Origin: "https://music.youtube.com" },
+    body: JSON.stringify({
+      context: { client: { clientName: "WEB_REMIX", clientVersion: "1.20250101.01.00", hl: "en" } },
+      videoId: id,
+      playlistId: `RDAMVM${id}`,
+    }),
+  });
+  if (!res.ok) throw new Error(`next ${res.status}`);
+  return parseRadio(await res.json(), id);
+}

@@ -434,7 +434,7 @@ export function Player({
 
         <VolumeHud volume={volume} show={volumeHud !== null} />
 
-        {listId && !queueOpen && <UpNext nextId={nextId} clock={clock} duration={snap.duration} />}
+        {!queueOpen && <UpNext nextId={nextId} clock={clock} duration={snap.duration} />}
 
         <AnimatePresence>
           {queueOpen && snap.playlist && (

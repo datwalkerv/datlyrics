@@ -3,6 +3,7 @@ import { parseArtist } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseYouTubeUrl } from "../parse-youtube-url";
+import { parseRadio } from "../video-source";
 
 describe("parseYouTubeUrl", () => {
   it.each([
@@ -139,5 +140,13 @@ describe("parseArtist", () => {
 
   it("returns null without an artist header", () => {
     expect(parseArtist({ contents: {} })).toBeNull();
+  });
+});
+
+describe("parseRadio", () => {
+  const track = (videoId: string) => ({ playlistPanelVideoRenderer: { videoId, title: { runs: [{ text: videoId }] } } });
+  it("lists related tracks in order, without the seed or repeats", () => {
+    const response = { contents: { tabs: [{ content: { contents: [track("seed"), track("a"), track("b"), track("a")] } }] } };
+    expect(parseRadio(response, "seed")).toEqual(["a", "b"]);
   });
 });

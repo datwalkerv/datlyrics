@@ -143,6 +143,8 @@ export function useYouTubePlayer(
   const resolverRef = useRef<ResolveVersion | null>(null);
   // Bumped on every load so a slow version lookup can't override a newer choice.
   const loadSeq = useRef(0);
+  // Tracks already used to fetch recommendations, so each seed is asked once.
+  const radioSeedsRef = useRef(new Set<string>());
   // Event handling for the current player.
   const handlers = useRef<{ state: (e: YT.OnStateChangeEvent) => void; error: (e: YT.OnErrorEvent) => void }>({
     state: () => {},
@@ -210,8 +212,28 @@ export function useYouTubePlayer(
     (i: number) => {
       const queue = queueRef.current;
       for (const k of [i + 1, i - 1]) if (k >= 0 && k < queue.length) void resolve(queue[k]);
+      // On the last track, append related songs so playback keeps going instead of ending.
+      const seed = queue[i];
+      if (i !== queue.length - 1 || !seed || radioSeedsRef.current.has(seed)) return;
+      radioSeedsRef.current.add(seed);
+      fetch(`/api/radio/${seed}`)
+        .then((res) => (res.ok ? (res.json() as Promise<{ ids: string[] }>) : null))
+        .then((data) => {
+          const original = originalRef.current;
+          // The player was torn down or reloaded meanwhile.
+          if (!data || !original.includes(seed)) return;
+          const fresh = data.ids.filter((id) => !original.includes(id));
+          if (!fresh.length) return;
+          const extended = [...original, ...fresh];
+          queueRef.current = queueRef.current === original ? extended : [...queueRef.current, ...fresh];
+          originalRef.current = extended;
+          sync();
+          const next = queueRef.current[indexRef.current + 1];
+          if (next) void resolve(next);
+        })
+        .catch(() => {});
     },
-    [resolve],
+    [resolve, sync],
   );
 
   /**
@@ -496,6 +518,7 @@ export function useYouTubePlayer(
       playerRef.current = null;
       queueRef.current = [];
       originalRef.current = [];
+      radioSeedsRef.current = new Set();
       indexRef.current = 0;
       loadedIdRef.current = null;
       host.remove();
