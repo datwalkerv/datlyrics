@@ -65,7 +65,7 @@ export function Player({
 }: {
   videoId?: string;
   listId?: string;
-  /** Out of sight while an artist page is open: keeps playing, shows a mini bar instead. */
+  /** Out of sight while home or an artist page is open: keeps playing, shows a mini bar instead. */
   minimized?: boolean;
 }) {
   const router = useRouter();
@@ -298,7 +298,7 @@ export function Player({
 
   useMediaSession({ controls, song, artwork, status: snap.status, duration: snap.duration, clock });
 
-  // The artist page has the keyboard while minimized (media keys still work via the Media Session).
+  // The page (home or artist) has the keyboard while minimized (media keys still work via the Media Session).
   useKeyboard(minimized ? {} : {
     // Media keys, for browsers that deliver them to the page as key presses.
     MediaPlayPause: () => controls.toggle(),

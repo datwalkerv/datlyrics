@@ -193,7 +193,7 @@ export default function Home() {
         </div>
       </section>
 
-      <footer className="flex flex-col items-center gap-3 px-5 pb-12 text-center text-sm text-white/30">
+      <footer className="flex flex-col items-center gap-3 px-5 pb-28 text-center text-sm text-white/30">
         <p>No accounts, no database, no analytics. Saved songs live in your browser.</p>
         <p>
           Lyrics by{" "}

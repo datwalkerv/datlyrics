@@ -5,7 +5,7 @@ import Link from "next/link";
 import type { SongInfo } from "@/lib/clean-title";
 import { CoverImage } from "./CoverImage";
 
-/** What's still playing while you browse an artist page, with a way back to the lyrics. */
+/** What's still playing while you browse home or an artist page, with a way back to the lyrics. */
 export function MiniPlayer({
   song,
   artwork,

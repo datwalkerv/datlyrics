@@ -8,7 +8,7 @@ import { Player } from "@/components/player/Player";
 type Target = { videoId?: string; listId?: string };
 
 /**
- * The player lives in the layout, not the /play page, so browsing an artist page doesn't stop it:
+ * The player lives in the layout, not the /play page, so going home or browsing an artist page doesn't stop it:
  * Next hides (and cleans up) pages you leave, but keeps layouts mounted.
  */
 export function PlayerHost() {
