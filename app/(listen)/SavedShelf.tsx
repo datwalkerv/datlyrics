@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState } from "react";
 import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
+import { playHere } from "./PlayerHost";
 import {
   PINNED,
   SAVED_LIMIT,
@@ -14,6 +15,7 @@ import {
   resolveSaved,
   saveItem,
   savedHref,
+  savedTarget,
   useSaved,
   type SavedItem,
 } from "@/lib/saved";
@@ -36,6 +38,8 @@ export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "hom
     savedAt: 0,
   };
   const router = useRouter();
+  // On /home it plays in the mini bar; the landing page opens the lyrics.
+  const play = (item: SavedItem) => (home ? playHere(savedTarget(item)) : router.push(savedHref(item)));
 
   // Playlists saved before covers were fetched show their first video instead; upgrade them once.
   useEffect(() => {
@@ -48,9 +52,9 @@ export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "hom
     <section className={home ? "w-full" : "mt-12 w-full max-w-3xl"} aria-label="Saved songs and playlists">
       <div className={`flex flex-wrap gap-4 ${home ? "sm:gap-5" : "justify-center"}`}>
         {pinned.map((item) => (
-          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} className={width} pinned onPlay={() => router.push(savedHref(item))} />
+          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} className={width} pinned onPlay={() => play(item)} />
         ))}
-        {songCount > 0 && <SavedCard item={savedSongs} className={width} pinned onPlay={() => router.push(savedHref(savedSongs))} />}
+        {songCount > 0 && <SavedCard item={savedSongs} className={width} pinned onPlay={() => play(savedSongs)} />}
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <motion.div
@@ -61,7 +65,7 @@ export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "hom
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.25 }}
             >
-              <SavedCard item={item} className={width} onPlay={() => router.push(savedHref(item))} />
+              <SavedCard item={item} className={width} onPlay={() => play(item)} />
             </motion.div>
           ))}
         </AnimatePresence>

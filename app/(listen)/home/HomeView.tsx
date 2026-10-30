@@ -1,13 +1,13 @@
 "use client";
 
 import Link from "next/link";
-import { useRouter } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import type { DiscoverShelf } from "@/lib/discover-source";
 import { useHistory, type HistoryEntry } from "@/lib/history";
-import { SAVED_LIST_ID, resolveSaved, savedHref, useSaved, type SavedItem } from "@/lib/saved";
+import { SAVED_LIST_ID, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
 import type { RadioTrack } from "@/lib/video-source";
 import { HomeSearch } from "../HomeSearch";
+import { playHere, usePlayerHref } from "../PlayerHost";
 import { SavedCard, SavedShelf } from "../SavedShelf";
 
 const CARD = "w-36 snap-start sm:w-40";
@@ -16,8 +16,8 @@ const CARD = "w-36 snap-start sm:w-40";
 export function HomeView() {
   const history = useHistory();
   const saved = useSaved();
-  const router = useRouter();
   const greeting = useGreeting();
+  const playerHref = usePlayerHref();
 
   const playlists = distinct(history.filter((h) => h.listId), (h) => h.listId!).slice(0, 8);
   const recent = distinct(history, (h) => h.id).slice(0, 20);
@@ -29,7 +29,7 @@ export function HomeView() {
   const discover = useDiscover();
   const glow = history[0]?.image ?? null;
 
-  const play = (item: Pick<SavedItem, "kind" | "id">) => router.push(savedHref(item));
+  const play = (item: Pick<SavedItem, "kind" | "id">) => playHere(savedTarget(item));
 
   return (
     <main className="relative min-h-dvh overflow-x-hidden bg-neutral-950 pb-36 text-white">
@@ -44,7 +44,8 @@ export function HomeView() {
         />
       )}
       <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:py-7">
-        <Link href="/home" className="text-xl font-extrabold tracking-[-0.04em]">
+        {/* Already home: the logo goes to what's playing instead. */}
+        <Link href={playerHref ?? "/home"} className="text-xl font-extrabold tracking-[-0.04em]">
           datlyrics
         </Link>
       </header>
@@ -151,7 +152,6 @@ function Skeletons() {
 
 /** A playlist you were in the middle of: its cover and name, resuming at the track you were on. */
 function ContinueCard({ entry }: { entry: HistoryEntry }) {
-  const router = useRouter();
   const listId = entry.listId!;
   const [list, setList] = useState<Pick<SavedItem, "title" | "image"> | null>(
     listId === SAVED_LIST_ID ? { title: "Saved", image: "/saved.svg" } : null,
@@ -182,7 +182,7 @@ function ContinueCard({ entry }: { entry: HistoryEntry }) {
       item={item}
       className={CARD}
       pinned
-      onPlay={() => router.push(`/play?${new URLSearchParams({ list: listId, v: entry.id })}`)}
+      onPlay={() => playHere({ listId, videoId: entry.id })}
     />
   );
 }

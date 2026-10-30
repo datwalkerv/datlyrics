@@ -2,10 +2,35 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { Player } from "@/components/player/Player";
 
-type Target = { videoId?: string; listId?: string };
+export type Target = { videoId?: string; listId?: string };
+
+// Pages other than /play (like /home) can start something without leaving: it plays minimized.
+let requested: Target | null = null;
+const listeners = new Set<() => void>();
+const subscribe = (fn: () => void) => {
+  listeners.add(fn);
+  return () => {
+    listeners.delete(fn);
+  };
+};
+
+// What the player has loaded, for links back to it (like /home's logo).
+let current: Target | null = null;
+
+/** The /play link for what's loaded in the player, or null when nothing is. */
+export function usePlayerHref(): string | null {
+  const t = useSyncExternalStore(subscribe, () => current, () => null);
+  return t ? `/play?${new URLSearchParams({ ...(t.videoId && { v: t.videoId }), ...(t.listId && { list: t.listId }) })}` : null;
+}
+
+/** Play this right where you are, in the mini bar; its link opens the lyrics. */
+export function playHere(target: Target) {
+  requested = { ...target };
+  for (const fn of listeners) fn();
+}
 
 /**
  * The player lives in the layout, not the /play page, so going home or browsing an artist page doesn't stop it:
@@ -24,10 +49,23 @@ export function PlayerHost() {
   };
   const hasUrlTarget = onPlay && !!(fromUrl.videoId || fromUrl.listId);
 
-  // Off /play, keep playing whatever /play last asked for.
+  // Off /play, keep playing whatever /play (or playHere) last asked for.
   const [last, setLast] = useState<Target | null>(null);
+  const request = useSyncExternalStore(subscribe, () => requested, () => null);
+  const [seenRequest, setSeenRequest] = useState(request);
+  if (request !== seenRequest) {
+    setSeenRequest(request);
+    if (request) setLast(request);
+  }
   if (hasUrlTarget && (fromUrl.videoId !== last?.videoId || fromUrl.listId !== last?.listId)) setLast(fromUrl);
   const target = hasUrlTarget ? fromUrl : last;
+
+  const videoId = target?.videoId;
+  const listId = target?.listId;
+  useEffect(() => {
+    current = videoId || listId ? { videoId, listId } : null;
+    for (const fn of listeners) fn();
+  }, [videoId, listId]);
 
   if (onPlay && !hasUrlTarget) {
     return (

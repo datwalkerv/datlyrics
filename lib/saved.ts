@@ -114,6 +114,9 @@ export function removeItem(kind: SavedItem["kind"], id: string) {
   write(read().filter((x) => !(x.kind === kind && x.id === id)));
 }
 
+export const savedTarget = (item: Pick<SavedItem, "kind" | "id">) =>
+  item.kind === "playlist" ? { listId: item.id } : { videoId: item.id };
+
 export const savedHref = (item: Pick<SavedItem, "kind" | "id">) =>
   item.kind === "playlist" ? `/play?list=${item.id}` : `/play?v=${item.id}`;
 
