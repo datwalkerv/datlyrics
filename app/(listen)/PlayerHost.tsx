@@ -4,7 +4,15 @@ import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState } from "react";
 import { Player } from "@/components/player/Player";
-import { publishCurrent, useRequested, type Target } from "@/components/player/remote";
+import {
+  endHistoryNav,
+  getNowPlaying,
+  isHistoryNav,
+  publishCurrent,
+  sameTarget,
+  useRequested,
+  type Target,
+} from "@/components/player/remote";
 
 /**
  * The player lives in the layout, not the /play page, so going home or browsing an artist page doesn't stop it:
@@ -23,7 +31,7 @@ export function PlayerHost() {
   };
   const hasUrlTarget = onPlay && !!(fromUrl.videoId || fromUrl.listId);
 
-  // Off /play, keep playing whatever /play (or playHere) last asked for.
+  // What the player was asked to play, by a /play link or playHere. It keeps playing off /play.
   const [last, setLast] = useState<Target | null>(null);
   const request = useRequested();
   const [seenRequest, setSeenRequest] = useState(request);
@@ -31,8 +39,19 @@ export function PlayerHost() {
     setSeenRequest(request);
     if (request) setLast(request);
   }
-  if (hasUrlTarget && (fromUrl.videoId !== last?.videoId || fromUrl.listId !== last?.listId)) setLast(fromUrl);
-  const target = hasUrlTarget ? fromUrl : last;
+  // A /play address is a new choice, unless it names what's already loaded or playing (the mini bar's
+  // link, the address the player keeps current) or the browser's back/forward brought us to an old one.
+  if (
+    hasUrlTarget &&
+    !sameTarget(fromUrl, last) &&
+    !sameTarget(fromUrl, getNowPlaying()) &&
+    !(isHistoryNav() && last)
+  ) {
+    setLast(fromUrl);
+  }
+  const target = hasUrlTarget && !last ? fromUrl : last;
+  const urlKey = `${pathname}?${sp}`;
+  useEffect(endHistoryNav, [urlKey]);
 
   const videoId = target?.videoId;
   const listId = target?.listId;

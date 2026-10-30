@@ -11,7 +11,7 @@ import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
 import { MiniPlayer } from "./MiniPlayer";
-import { PLAY_NEXT_EVENT } from "./remote";
+import { PLAY_NEXT_EVENT, playHref, publishNowPlaying } from "./remote";
 import { Settings } from "./Settings";
 import { NowPlaying } from "./NowPlaying";
 import { PlainLyrics } from "./PlainLyrics";
@@ -105,6 +105,16 @@ export function Player({
   // Lyrics, artwork and titles follow the queue entry, not whichever upload of it is playing, so
   // a Song <-> Video swap doesn't reload or re-animate them.
   const original = snap.playlist?.[snap.index] ?? snap.videoId;
+  const nowPlayingHref = original ? playHref({ videoId: original, listId }) : playHref({ videoId, listId });
+
+  // Share what's actually playing, and keep the address on it while the lyrics are open, so
+  // reloading or sharing it gives this song (PlayerHost knows it's already playing).
+  useEffect(() => {
+    if (!original) return;
+    publishNowPlaying({ videoId: original, listId });
+    if (!minimized && window.location.pathname === "/play" && `${window.location.pathname}${window.location.search}` !== nowPlayingHref)
+      window.history.replaceState(null, "", nowPlayingHref);
+  }, [original, listId, minimized, nowPlayingHref]);
   const playingOriginal = snap.videoId === original;
   // Until the slot's upload has actually loaded, the player still reports the previous track.
   const playingThisTrack = !!snap.videoId && snap.videoId === snap.loadedId;
@@ -571,7 +581,7 @@ export function Player({
           artwork={artwork}
           playing={playing}
           onToggle={() => controls.toggle()}
-          href={`/play?${new URLSearchParams({ ...(videoId && { v: videoId }), ...(listId && { list: listId }) })}`}
+          href={nowPlayingHref}
         />
       )}
     </>

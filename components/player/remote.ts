@@ -36,11 +36,39 @@ export function publishCurrent(t: Target | null) {
 /** Whether something is loaded in the player (to queue after). */
 export const isPlayerLoaded = () => current !== null;
 
-/** The /play link for what's loaded in the player, or null when nothing is. */
-export function usePlayerHref(): string | null {
-  const t = useSyncExternalStore(subscribe, () => current, () => null);
-  return t ? `/play?${new URLSearchParams({ ...(t.videoId && { v: t.videoId }), ...(t.listId && { list: t.listId }) })}` : null;
+export const sameTarget = (a: Target | null, b: Target | null) =>
+  !!a && !!b && a.videoId === b.videoId && a.listId === b.listId;
+
+export const playHref = (t: Target) =>
+  `/play?${new URLSearchParams({ ...(t.videoId && { v: t.videoId }), ...(t.listId && { list: t.listId }) })}`;
+
+// The track actually playing (the queue moves on from what was started), in its list.
+let nowPlaying: Target | null = null;
+export const getNowPlaying = () => nowPlaying;
+export function publishNowPlaying(t: Target | null) {
+  if (sameTarget(t, nowPlaying) || t === nowPlaying) return;
+  nowPlaying = t;
+  notify();
 }
+
+/** The /play link for what's playing right now, or null when nothing is. */
+export function usePlayerHref(): string | null {
+  const t = useSyncExternalStore(subscribe, () => nowPlaying ?? current, () => null);
+  return t ? playHref(t) : null;
+}
+
+// Back/forward lands on old /play addresses; those show the player, they don't restart what they named.
+let historyNav = false;
+if (typeof window !== "undefined") {
+  window.addEventListener("popstate", () => {
+    historyNav = true;
+  });
+}
+/** Whether the current URL change came from the browser's back/forward. */
+export const isHistoryNav = () => historyNav;
+export const endHistoryNav = () => {
+  historyNav = false;
+};
 
 /** Play this right where you are, in the mini bar; its link opens the lyrics. */
 export function playHere(target: Target) {
