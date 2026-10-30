@@ -1,6 +1,7 @@
 "use client";
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
+import { insertNext } from "@/lib/queue";
 import { SAVED_LIST_ID, savedSongIds } from "@/lib/saved";
 import { YouTubeBridge } from "./bridge";
 
@@ -575,6 +576,23 @@ export function useYouTubePlayer(
       },
       getTime: () => playerRef.current?.getCurrentTime() ?? 0,
       next: () => playIndex(indexRef.current + 1),
+      /** Queue a track right after the current one, in shuffled and playlist order alike. */
+      playNext: (id: string) => {
+        const i = indexRef.current;
+        const current = queueRef.current[i];
+        if (current === undefined) return;
+        const shared = queueRef.current === originalRef.current;
+        const moved = insertNext(queueRef.current, i, id);
+        queueRef.current = moved.queue;
+        indexRef.current = moved.index;
+        originalRef.current = shared
+          ? moved.queue
+          : insertNext(originalRef.current, Math.max(originalRef.current.indexOf(current), 0), id).queue;
+        // The embed's playlist is in the old order: stop following it, the next track change reloads it.
+        embedListRef.current = [];
+        sync();
+        prefetchAround(moved.index);
+      },
       playAt: (i: number) => playIndex(i),
       prev: () => {
         const p = playerRef.current;
@@ -589,7 +607,7 @@ export function useYouTubePlayer(
         loadId(id, getStart());
       },
     }),
-    [playIndex, loadId, reorder],
+    [playIndex, loadId, reorder, sync, prefetchAround],
   );
 
   return { snap, clock, controls };

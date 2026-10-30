@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseBackup } from "../backup";
+import { insertNext } from "../queue";
 import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { activeLineIndex, parseLrc } from "../lrc";
@@ -216,5 +217,18 @@ describe("parseBackup", () => {
     expect(parseBackup(file({}, "other-app"))).toBeNull();
     expect(parseBackup(file(["datlyrics:saved"]))).toBeNull();
     expect(parseBackup("null")).toBeNull();
+  });
+});
+
+describe("insertNext", () => {
+  it("adds a new track right after the current one", () => {
+    expect(insertNext(["a", "b", "c"], 0, "x")).toEqual({ queue: ["a", "x", "b", "c"], index: 0 });
+  });
+  it("moves an already queued track, keeping the current one current", () => {
+    expect(insertNext(["a", "b", "c", "d"], 2, "a")).toEqual({ queue: ["b", "c", "a", "d"], index: 1 });
+    expect(insertNext(["a", "b", "c", "d"], 1, "d")).toEqual({ queue: ["a", "b", "d", "c"], index: 1 });
+  });
+  it("leaves the queue alone for the current track", () => {
+    expect(insertNext(["a", "b"], 1, "b")).toEqual({ queue: ["a", "b"], index: 1 });
   });
 });

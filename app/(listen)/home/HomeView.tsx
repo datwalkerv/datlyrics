@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useEffect, useState, type ReactNode } from "react";
+import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { ArtistRelease } from "@/lib/artist-source";
 import { useHistory, type HistoryEntry } from "@/lib/history";
 import { PINNED, SAVED_LIST_ID, isPinned, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
@@ -10,6 +10,7 @@ import type { RadioTrack } from "@/lib/video-source";
 import { HomeSearch } from "../HomeSearch";
 import { playHere, usePlayerHref } from "../PlayerHost";
 import { SavedCard, SavedShelf } from "../SavedShelf";
+import { SongMenu, menuAt, type SongMenuState } from "./SongMenu";
 
 const CARD = "w-36 snap-start sm:w-40";
 
@@ -40,6 +41,19 @@ export function HomeView() {
   const glow = history[0]?.image ?? null;
 
   const play = (item: Pick<SavedItem, "kind" | "id">) => playHere(savedTarget(item));
+  const [menu, setMenu] = useState<SongMenuState | null>(null);
+  const closeMenu = useCallback(() => setMenu(null), []);
+
+  /** A song card with the right-click menu (play next, save). */
+  const songCard = (song: SavedItem) => (
+    <SavedCard
+      item={song}
+      className={CARD}
+      pinned
+      onPlay={() => play(song)}
+      onContextMenu={(e) => setMenu(menuAt(e, song))}
+    />
+  );
 
   return (
     <main className="relative min-h-dvh overflow-x-clip bg-neutral-950 pb-36 text-white">
@@ -83,9 +97,7 @@ export function HomeView() {
             <Row>
               {recommended
                 ? recommended.map((t) => (
-                    <Animated key={t.id}>
-                      <SavedCard item={songItem(t.id, t.title, t.artist, t.image)} className={CARD} pinned onPlay={() => play({ kind: "song", id: t.id })} />
-                    </Animated>
+                    <Animated key={t.id}>{songCard(songItem(t.id, t.title, t.artist, t.image))}</Animated>
                   ))
                 : <Skeletons />}
             </Row>
@@ -96,9 +108,7 @@ export function HomeView() {
           <Section title="Recently played">
             <Row>
               {recent.map((h) => (
-                <Animated key={h.id}>
-                  <SavedCard item={songItem(h.id, h.title, h.artist, h.image)} className={CARD} pinned onPlay={() => play({ kind: "song", id: h.id })} />
-                </Animated>
+                <Animated key={h.id}>{songCard(songItem(h.id, h.title, h.artist, h.image))}</Animated>
               ))}
             </Row>
           </Section>
@@ -145,6 +155,8 @@ export function HomeView() {
           </Section>
         )}
       </div>
+
+      <AnimatePresence>{menu && <SongMenu key={`${menu.song.id}:${menu.x}:${menu.y}`} menu={menu} onClose={closeMenu} />}</AnimatePresence>
     </main>
   );
 }

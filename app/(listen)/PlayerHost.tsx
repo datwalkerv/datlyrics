@@ -3,7 +3,7 @@
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { Player } from "@/components/player/Player";
+import { PLAY_NEXT_EVENT, Player } from "@/components/player/Player";
 
 export type Target = { videoId?: string; listId?: string };
 
@@ -24,6 +24,12 @@ let current: Target | null = null;
 export function usePlayerHref(): string | null {
   const t = useSyncExternalStore(subscribe, () => current, () => null);
   return t ? `/play?${new URLSearchParams({ ...(t.videoId && { v: t.videoId }), ...(t.listId && { list: t.listId }) })}` : null;
+}
+
+/** Queue a song right after what's playing; with nothing playing, just play it here. */
+export function playNext(videoId: string) {
+  if (!current) return playHere({ videoId });
+  window.dispatchEvent(new CustomEvent(PLAY_NEXT_EVENT, { detail: videoId }));
 }
 
 /** Play this right where you are, in the mini bar; its link opens the lyrics. */

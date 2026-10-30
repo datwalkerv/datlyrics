@@ -120,14 +120,16 @@ export function SavedCard({
   pinned = false,
   className = "w-28",
   onPlay,
+  onContextMenu,
 }: {
   item: SavedItem;
   pinned?: boolean;
   className?: string;
   onPlay: () => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   return (
-    <div className={`group relative shrink-0 text-left ${className}`}>
+    <div className={`group relative shrink-0 text-left ${className}`} onContextMenu={onContextMenu}>
       <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`}>
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
           {item.image && (
