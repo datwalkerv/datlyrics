@@ -125,3 +125,33 @@ export function mergeReleases<T extends ArtistRelease>(lists: T[][], max = 20): 
     .sort((a, b) => Number(b.year || 0) - Number(a.year || 0))
     .slice(0, max);
 }
+
+/** Every artist credit in a playlist (an album credits its artist in the header), as channel ids, repeats kept. */
+export async function getPlaylistArtists(listId: string): Promise<string[]> {
+  "use cache";
+  cacheLife("days");
+
+  return parsePlaylistArtists(await call("browse", { browseId: `VL${listId}` }));
+}
+
+type BrowseEndpoint = {
+  browseId?: string;
+  browseEndpointContextSupportedConfigs?: { browseEndpointContextMusicConfig?: { pageType?: string } };
+};
+
+export function parsePlaylistArtists(data: unknown): string[] {
+  return (findAll(data, "browseEndpoint") as BrowseEndpoint[])
+    .filter((e) => e.browseEndpointContextSupportedConfigs?.browseEndpointContextMusicConfig?.pageType === "MUSIC_PAGE_TYPE_ARTIST")
+    .map((e) => e.browseId ?? "")
+    .filter(isChannelId);
+}
+
+/** The artists credited most across all these lists of credits; ties keep first-seen order. */
+export function rankArtists(credits: string[], max = 4): string[] {
+  const counts = new Map<string, number>();
+  for (const id of credits) counts.set(id, (counts.get(id) ?? 0) + 1);
+  return [...counts.entries()]
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, max)
+    .map(([id]) => id);
+}

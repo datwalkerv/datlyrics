@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { mergeReleases, parseArtist } from "../artist-source";
+import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseYouTubeUrl } from "../parse-youtube-url";
@@ -180,5 +180,24 @@ describe("mergeReleases", () => {
     const a = [rel("a26", "2026"), rel("a26b", "2026"), rel("a24", "2024")];
     const b = [rel("b26", "2026"), rel("b25", "2025"), rel("a26", "2026")];
     expect(mergeReleases([a, b]).map((r) => r.listId)).toEqual(["a26", "b26", "a26b", "b25", "a24"]);
+  });
+});
+
+describe("parsePlaylistArtists", () => {
+  const artist = (browseId: string) => ({
+    browseEndpoint: { browseId, browseEndpointContextSupportedConfigs: { browseEndpointContextMusicConfig: { pageType: "MUSIC_PAGE_TYPE_ARTIST" } } },
+  });
+  const album = { browseEndpoint: { browseId: "MPREb_x", browseEndpointContextSupportedConfigs: { browseEndpointContextMusicConfig: { pageType: "MUSIC_PAGE_TYPE_ALBUM" } } } };
+  const A = "UCaaaaaaaaaaaaaaaaaaaaaa";
+  const B = "UCbbbbbbbbbbbbbbbbbbbbbb";
+  it("collects artist credits with repeats, skipping albums and odd ids", () => {
+    const rows = [{ runs: [{ navigationEndpoint: artist(A) }, { navigationEndpoint: album }] }, { runs: [{ navigationEndpoint: artist(A) }] }, { runs: [{ navigationEndpoint: artist(B) }, { navigationEndpoint: artist("UCshort") }] }];
+    expect(parsePlaylistArtists({ contents: rows })).toEqual([A, A, B]);
+  });
+});
+
+describe("rankArtists", () => {
+  it("ranks by credits, ties in first-seen order", () => {
+    expect(rankArtists(["b", "a", "c", "a", "c", "d"], 3)).toEqual(["a", "c", "b"]);
   });
 });

@@ -35,8 +35,8 @@ export function HomeView() {
     listId === SAVED_LIST_ID || isPinned("playlist", listId) || saved.some((x) => x.kind === "playlist" && x.id === listId);
   const unsaved = lastInList.filter((h) => !isOnShelf(h.listId!)).slice(0, 6);
 
-  const artists = topArtists(history, saved);
-  const releases = useReleases(artists);
+  // From your library only, not what's playing: it stays put until you save or remove something.
+  const releases = useReleases(libraryQuery(saved));
   const glow = history[0]?.image ?? null;
 
   const play = (item: Pick<SavedItem, "kind" | "id">) => playHere(savedTarget(item));
@@ -112,22 +112,34 @@ export function HomeView() {
           />
         </Section>
 
-        {artists.length > 0 && releases?.length !== 0 && (
+        {releases !== undefined && (releases === null || releases.singles.length + releases.albums.length > 0) && (
           <Section title="New from your artists">
-            <Row>
-              {releases
-                ? releases.map((r) => (
-                    <Animated key={r.listId}>
-                      <SavedCard
-                        item={{ kind: "playlist", id: r.listId, title: r.title, subtitle: [r.artist, r.year].filter(Boolean).join(" · "), image: r.image, savedAt: 0 }}
-                        className={CARD}
-                        pinned
-                        onPlay={() => play({ kind: "playlist", id: r.listId })}
-                      />
-                    </Animated>
-                  ))
-                : <Skeletons />}
-            </Row>
+            <div className="flex flex-col gap-8">
+              {(["singles", "albums"] as const).map(
+                (kind) =>
+                  (!releases || releases[kind].length > 0) && (
+                    <div key={kind}>
+                      <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-white/40">
+                        {kind === "singles" ? "Singles & EPs" : "Albums"}
+                      </h3>
+                      <Row>
+                        {releases
+                          ? releases[kind].map((r) => (
+                              <Animated key={r.listId}>
+                                <SavedCard
+                                  item={releaseItem(r)}
+                                  className={CARD}
+                                  pinned
+                                  onPlay={() => play({ kind: "playlist", id: r.listId })}
+                                />
+                              </Animated>
+                            ))
+                          : <Skeletons />}
+                      </Row>
+                    </div>
+                  ),
+              )}
+            </div>
           </Section>
         )}
       </div>
@@ -223,19 +235,28 @@ function distinct<T>(items: T[], key: (x: T) => string): T[] {
   return items.filter((x) => !seen.has(key(x)) && !!seen.add(key(x)));
 }
 
-/** The artists you play and save most (saves count double), main artist only: "A, B feat. C" is A. */
-function topArtists(history: HistoryEntry[], saved: SavedItem[], max = 4): string[] {
-  const score = new Map<string, { name: string; n: number }>();
-  const add = (raw: string, n: number) => {
-    const name = raw.split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0].trim();
-    if (!name) return;
-    const key = name.toLowerCase();
-    const cur = score.get(key) ?? { name, n: 0 };
-    score.set(key, { name: cur.name, n: cur.n + n });
-  };
-  for (const h of history) add(h.artist, 1);
-  for (const s of saved) if (s.kind === "song") add(s.subtitle, 2);
-  return [...score.values()].sort((a, b) => b.n - a.n).slice(0, max).map((x) => x.name);
+const releaseItem = (r: Release): SavedItem => ({
+  kind: "playlist",
+  id: r.listId,
+  title: r.title,
+  subtitle: [r.artist, r.year].filter(Boolean).join(" · "),
+  image: r.image,
+  savedAt: 0,
+});
+
+/**
+ * The library the releases come from: each saved song's main artist ("A, B feat. C" is A) and each
+ * saved playlist. Empty when nothing is saved.
+ */
+function libraryQuery(saved: SavedItem[]): string {
+  const params = new URLSearchParams();
+  for (const s of saved) {
+    if (s.kind === "song") {
+      const artist = s.subtitle.split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0].trim();
+      if (artist) params.append("artist", artist);
+    } else if (s.id !== SAVED_LIST_ID) params.append("list", s.id);
+  }
+  return params.toString();
 }
 
 /** Songs related to `seed`. Keeps showing the last batch while a new seed loads; null until the first. */
@@ -255,21 +276,24 @@ function useRadio(seed: string | null): RadioTrack[] | null {
   return tracks;
 }
 
-/** Latest albums and singles from these artists. Keeps the last list while a new one loads; null until the first. */
-function useReleases(artists: string[]): Release[] | null {
-  const [releases, setReleases] = useState<Release[] | null>(null);
-  const query = new URLSearchParams(artists.map((a) => ["artist", a])).toString();
+type Releases = { singles: Release[]; albums: Release[] };
+
+/** Releases for this library: undefined when it's empty, null while loading. Refetches only when the library changes. */
+function useReleases(query: string): Releases | null | undefined {
+  const [state, setState] = useState<{ query: string; releases: Releases } | null>(null);
   useEffect(() => {
     if (!query) return;
     let alive = true;
+    const none = { singles: [], albums: [] };
     fetch(`/api/releases?${query}`)
-      .then((res) => (res.ok ? (res.json() as Promise<{ releases: Release[] }>) : { releases: [] }))
-      .then((data) => alive && setReleases(data.releases))
-      .catch(() => alive && setReleases([]));
+      .then((res) => (res.ok ? (res.json() as Promise<Releases>) : none))
+      .then((releases) => alive && setState({ query, releases }))
+      .catch(() => alive && setState({ query, releases: none }));
     return () => {
       alive = false;
     };
   }, [query]);
-  return releases;
+  if (!query) return undefined;
+  // Keep showing the previous library's releases while a changed one loads.
+  return state?.releases ?? null;
 }
-
