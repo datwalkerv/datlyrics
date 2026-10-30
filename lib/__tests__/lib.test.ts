@@ -3,6 +3,7 @@ import { parseArtist } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseYouTubeUrl } from "../parse-youtube-url";
+import { parseDiscover } from "../discover-source";
 import { parseRadio } from "../video-source";
 
 describe("parseYouTubeUrl", () => {
@@ -144,9 +145,73 @@ describe("parseArtist", () => {
 });
 
 describe("parseRadio", () => {
-  const track = (videoId: string) => ({ playlistPanelVideoRenderer: { videoId, title: { runs: [{ text: videoId }] } } });
+  const track = (videoId: string) => ({
+    playlistPanelVideoRenderer: {
+      videoId,
+      title: { runs: [{ text: `title:${videoId}` }] },
+      shortBylineText: { runs: [{ text: `artist:${videoId}` }] },
+      thumbnail: { thumbnails: [{ url: `small:${videoId}`, width: 60 }, { url: `big:${videoId}`, width: 400 }] },
+    },
+  });
   it("lists related tracks in order, without the seed or repeats", () => {
     const response = { contents: { tabs: [{ content: { contents: [track("seed"), track("a"), track("b"), track("a")] } }] } };
-    expect(parseRadio(response, "seed")).toEqual(["a", "b"]);
+    expect(parseRadio(response, "seed")).toEqual([
+      { id: "a", title: "title:a", artist: "artist:a", image: "big:a" },
+      { id: "b", title: "title:b", artist: "artist:b", image: "big:b" },
+    ]);
+  });
+});
+
+describe("parseDiscover", () => {
+  const runs = (...t: string[]) => ({ runs: t.map((text) => ({ text })) });
+  const thumbs = (url: string) => ({ thumbnails: [{ url: `${url}=w60-h60-l90`, width: 60 }, { url: `${url}=w120-h120-l90`, width: 120 }] });
+  const shelf = (title: string, contents: object[]) => ({
+    musicCarouselShelfRenderer: { header: { musicCarouselShelfBasicHeaderRenderer: { title: runs(title) } }, contents },
+  });
+  // Trimmed from a real music.youtube.com FEmusic_home `browse` response.
+  const response = {
+    contents: {
+      sectionListRenderer: {
+        contents: [
+          shelf("Quick picks", [
+            {
+              musicResponsiveListItemRenderer: {
+                thumbnail: { musicThumbnailRenderer: { thumbnail: thumbs("img:beat") } },
+                flexColumns: [
+                  { musicResponsiveListItemFlexColumnRenderer: { text: { runs: [{ text: "Beat It", navigationEndpoint: { watchEndpoint: { videoId: "kOn-HdEg6AQ" } } }] } } },
+                  { musicResponsiveListItemFlexColumnRenderer: { text: runs("Michael Jackson", " • ", "Thriller") } },
+                ],
+              },
+            },
+          ]),
+          shelf("New releases", [
+            {
+              musicTwoRowItemRenderer: {
+                title: runs("Naked"),
+                subtitle: runs("Single", " • ", "Someone"),
+                thumbnailRenderer: { musicThumbnailRenderer: { thumbnail: thumbs("img:naked") } },
+                menu: { items: [{ navigationEndpoint: { watchPlaylistEndpoint: { playlistId: "OLAK5uy_naked" } } }] },
+              },
+            },
+            // An artist card: nothing to play, so it's left out.
+            { musicTwoRowItemRenderer: { title: runs("Some Artist"), subtitle: runs("Artist") } },
+          ]),
+          shelf("Nothing playable", [{ musicTwoRowItemRenderer: { title: runs("x") } }]),
+        ],
+      },
+    },
+  };
+
+  it("keeps each shelf's playable songs and playlists, with sharp covers", () => {
+    expect(parseDiscover(response)).toEqual([
+      {
+        title: "Quick picks",
+        items: [{ kind: "song", id: "kOn-HdEg6AQ", title: "Beat It", subtitle: "Michael Jackson", image: "img:beat=w544-h544-l90" }],
+      },
+      {
+        title: "New releases",
+        items: [{ kind: "playlist", id: "OLAK5uy_naked", title: "Naked", subtitle: "Single • Someone", image: "img:naked=w544-h544-l90" }],
+      },
+    ]);
   });
 });

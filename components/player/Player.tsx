@@ -5,6 +5,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
+import { recordPlay } from "@/lib/history";
 import { SAVED_LIST_ID, isPinned, isSaved, removeItem, resolveSaved, saveItem } from "@/lib/saved";
 import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
@@ -110,6 +111,13 @@ export function Player({
   const idle = useIdle(2500, playing && !queueOpen && !minimized);
   const nextId = snap.playlist?.[snap.index + 1] ?? null;
   const trackKey = `${snap.index}:${original ?? "none"}`;
+
+  // Feed /home's "Continue listening" and "Recently played" once a track actually plays.
+  const playingNow = snap.status === "playing" && playingThisTrack;
+  useEffect(() => {
+    if (playingNow && original && song)
+      recordPlay({ id: original, title: song.title, artist: song.artist, image: artwork, listId: listId ?? null });
+  }, [playingNow, original, song, artwork, listId]);
   const offset = offsetState.id === snap.videoId ? offsetState.value : 0;
   // A song upload has nothing to watch (static cover); keep the artwork even in video mode.
   const showVideo = videoMode && classifyUpload(snap.rawTitle, snap.channel) !== "song";
@@ -324,7 +332,7 @@ export function Player({
     "]": () => adjustOffset(0.25),
     Escape: () => {
       if (queueOpen) setQueueOpen(false);
-      else if (!document.fullscreenElement) router.push("/");
+      else if (!document.fullscreenElement) router.push("/home");
     },
   });
 
@@ -411,7 +419,7 @@ export function Player({
             idle ? "pointer-events-none opacity-0" : "opacity-100"
           }`}
         >
-          <Link href="/" className="pointer-events-auto text-lg font-bold tracking-tight text-white/70 hover:text-white">
+          <Link href="/home" className="pointer-events-auto text-lg font-bold tracking-tight text-white/70 hover:text-white">
             datlyrics
           </Link>
           <div className="flex items-center gap-5">
@@ -419,6 +427,16 @@ export function Player({
               ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
             </p>
             <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
+            <Link
+              href="/"
+              aria-label="datlyrics landing page"
+              title="datlyrics landing page"
+              className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
+            >
+              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden>
+                <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z" />
+              </svg>
+            </Link>
             <button
               onClick={openSearch}
               aria-label="Search"
@@ -485,7 +503,7 @@ export function Player({
               {snap.status === "error" && (
                 <>
                   <p className="max-w-xl text-2xl font-bold">{snap.error}</p>
-                  <Link href="/" className="rounded-full bg-white px-6 py-3 font-semibold text-black">
+                  <Link href="/home" className="rounded-full bg-white px-6 py-3 font-semibold text-black">
                     Try another link
                   </Link>
                 </>

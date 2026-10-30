@@ -1,4 +1,5 @@
 import { cacheLife } from "next/cache";
+import { biggestThumb, findAll, text } from "./artist-source";
 
 export type VideoInfo = { title: string; channel: string };
 
@@ -72,20 +73,23 @@ export async function getPlaylistInfo(id: string): Promise<PlaylistInfo | null> 
   return { title: data.title, channel: data.author_name, thumbnail: cover ?? fallback };
 }
 
-/** Track ids in a YouTube Music `next` response (its radio queue), in order, without `seed`. */
-export function parseRadio(node: unknown, seed: string, out = new Set<string>()): string[] {
-  if (Array.isArray(node)) for (const x of node) parseRadio(x, seed, out);
-  else if (node && typeof node === "object") {
-    const o = node as Record<string, unknown>;
-    const id = (o.playlistPanelVideoRenderer as { videoId?: unknown } | undefined)?.videoId;
-    if (typeof id === "string" && id !== seed) out.add(id);
-    for (const v of Object.values(o)) parseRadio(v, seed, out);
+export type RadioTrack = { id: string; title: string; artist: string; image: string | null };
+
+/** Tracks in a YouTube Music `next` response (its radio queue), in order, without `seed`. */
+export function parseRadio(json: unknown, seed: string): RadioTrack[] {
+  const seen = new Set([seed]);
+  const tracks: RadioTrack[] = [];
+  for (const r of findAll(json, "playlistPanelVideoRenderer")) {
+    const id = r.videoId;
+    if (typeof id !== "string" || seen.has(id)) continue;
+    seen.add(id);
+    tracks.push({ id, title: text(r.title), artist: text(r.shortBylineText), image: biggestThumb(r.thumbnail) });
   }
-  return [...out];
+  return tracks;
 }
 
 /** Songs related to `id`: YouTube Music's radio for it, what it plays once your queue runs out. */
-export async function getRadio(id: string): Promise<string[]> {
+export async function getRadio(id: string): Promise<RadioTrack[]> {
   "use cache";
   cacheLife("hours");
 

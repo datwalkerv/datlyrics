@@ -33,7 +33,7 @@ export function PlayerHost() {
     return (
       <main className="flex h-dvh flex-col items-center justify-center gap-6 bg-neutral-950 text-white">
         <p className="text-2xl font-bold">Nothing to play.</p>
-        <Link href="/" className="rounded-full bg-white px-6 py-3 font-semibold text-black">
+        <Link href="/home" className="rounded-full bg-white px-6 py-3 font-semibold text-black">
           Paste a link
         </Link>
       </main>

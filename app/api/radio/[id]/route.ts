@@ -7,7 +7,7 @@ export async function GET(_req: NextRequest, ctx: RouteContext<"/api/radio/[id]"
 
   try {
     return Response.json(
-      { ids: await getRadio(id) },
+      { tracks: await getRadio(id) },
       { headers: { "Cache-Control": "public, s-maxage=3600, stale-while-revalidate=86400" } },
     );
   } catch {

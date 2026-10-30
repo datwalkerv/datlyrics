@@ -217,12 +217,12 @@ export function useYouTubePlayer(
       if (i !== queue.length - 1 || !seed || radioSeedsRef.current.has(seed)) return;
       radioSeedsRef.current.add(seed);
       fetch(`/api/radio/${seed}`)
-        .then((res) => (res.ok ? (res.json() as Promise<{ ids: string[] }>) : null))
+        .then((res) => (res.ok ? (res.json() as Promise<{ tracks: { id: string }[] }>) : null))
         .then((data) => {
           const original = originalRef.current;
           // The player was torn down or reloaded meanwhile.
           if (!data || !original.includes(seed)) return;
-          const fresh = data.ids.filter((id) => !original.includes(id));
+          const fresh = data.tracks.map((t) => t.id).filter((id) => !original.includes(id));
           if (!fresh.length) return;
           const extended = [...original, ...fresh];
           queueRef.current = queueRef.current === original ? extended : [...queueRef.current, ...fresh];

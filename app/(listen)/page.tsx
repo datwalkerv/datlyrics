@@ -65,17 +65,31 @@ export default function Home() {
   return (
     <main className="relative overflow-x-hidden bg-neutral-950 text-white">
       <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:py-7">
-        <span className="text-xl font-extrabold tracking-[-0.04em]">datlyrics</span>
-        <a
-          href={GITHUB_URL}
-          target="_blank"
-          rel="noreferrer"
-          aria-label="datlyrics on GitHub"
-          className="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-white/50 transition hover:bg-white/10 hover:text-white"
-        >
-          <GitHubIcon className="size-5" />
-          <span className="max-sm:hidden">GitHub</span>
-        </a>
+        <Link href="/home" className="text-xl font-extrabold tracking-[-0.04em]">
+          datlyrics
+        </Link>
+        <div className="flex items-center gap-2">
+          <Link
+            href="/home"
+            className="flex items-center gap-2 rounded-full bg-white/10 px-4 py-2 text-sm font-semibold text-white/85 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
+          >
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <circle cx="12" cy="12" r="9" />
+              <path d="m15.5 8.5-2 5-5 2 2-5 5-2Z" strokeLinejoin="round" />
+            </svg>
+            Discover
+          </Link>
+          <a
+            href={GITHUB_URL}
+            target="_blank"
+            rel="noreferrer"
+            aria-label="datlyrics on GitHub"
+            className="flex items-center gap-2 rounded-full px-3 py-2 text-sm font-medium text-white/50 transition hover:bg-white/10 hover:text-white"
+          >
+            <GitHubIcon className="size-5" />
+            <span className="max-sm:hidden">GitHub</span>
+          </a>
+        </div>
       </header>
 
       <section className="relative px-5 pb-24 pt-10 lg:pt-16">

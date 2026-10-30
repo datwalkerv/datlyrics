@@ -18,8 +18,10 @@ import {
   type SavedItem,
 } from "@/lib/saved";
 
-/** Saved songs and playlists (kept in localStorage) as one-click cards. */
-export function SavedShelf() {
+/** Saved songs and playlists (kept in localStorage) as one-click cards: centered on the landing page, left-aligned and larger on /home. */
+export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "home" }) {
+  const home = variant === "home";
+  const width = home ? "w-36 sm:w-40" : "w-28";
   const pinned = usePinned();
   // A pinned item the user also saved shows once, as the pinned card.
   const saved = useSaved();
@@ -43,12 +45,12 @@ export function SavedShelf() {
   }, [items]);
 
   return (
-    <section className="mt-12 w-full max-w-3xl" aria-label="Saved songs and playlists">
-      <div className="flex flex-wrap justify-center gap-4">
+    <section className={home ? "w-full" : "mt-12 w-full max-w-3xl"} aria-label="Saved songs and playlists">
+      <div className={`flex flex-wrap gap-4 ${home ? "sm:gap-5" : "justify-center"}`}>
         {pinned.map((item) => (
-          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} pinned onPlay={() => router.push(savedHref(item))} />
+          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} className={width} pinned onPlay={() => router.push(savedHref(item))} />
         ))}
-        {songCount > 0 && <SavedCard item={savedSongs} pinned onPlay={() => router.push(savedHref(savedSongs))} />}
+        {songCount > 0 && <SavedCard item={savedSongs} className={width} pinned onPlay={() => router.push(savedHref(savedSongs))} />}
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <motion.div
@@ -59,11 +61,11 @@ export function SavedShelf() {
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.25 }}
             >
-              <SavedCard item={item} onPlay={() => router.push(savedHref(item))} />
+              <SavedCard item={item} className={width} onPlay={() => router.push(savedHref(item))} />
             </motion.div>
           ))}
         </AnimatePresence>
-        <AddCard />
+        <AddCard className={width} />
       </div>
     </section>
   );
@@ -88,9 +90,19 @@ function usePinned(): SavedItem[] {
   return items;
 }
 
-function SavedCard({ item, pinned = false, onPlay }: { item: SavedItem; pinned?: boolean; onPlay: () => void }) {
+export function SavedCard({
+  item,
+  pinned = false,
+  className = "w-28",
+  onPlay,
+}: {
+  item: SavedItem;
+  pinned?: boolean;
+  className?: string;
+  onPlay: () => void;
+}) {
   return (
-    <div className="group relative w-28 text-left">
+    <div className={`group relative shrink-0 text-left ${className}`}>
       <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`}>
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
           {item.image && (
@@ -132,7 +144,7 @@ function SavedCard({ item, pinned = false, onPlay }: { item: SavedItem; pinned?:
   );
 }
 
-function AddCard() {
+function AddCard({ className }: { className: string }) {
   const [open, setOpen] = useState(false);
   const [value, setValue] = useState("");
   const [state, setState] = useState<"idle" | "saving" | "error" | "full">("idle");
@@ -157,7 +169,7 @@ function AddCard() {
 
   if (!open) {
     return (
-      <button onClick={() => setOpen(true)} className="group w-28 text-left" title="Save a song or playlist">
+      <button onClick={() => setOpen(true)} className={`group text-left ${className}`} title="Save a song or playlist">
         <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-white/15 text-white/35 transition group-hover:border-white/35 group-hover:text-white/70">
           <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
             <path d="M12 5v14M5 12h14" strokeLinecap="round" />

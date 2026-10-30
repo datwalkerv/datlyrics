@@ -19,7 +19,7 @@ const ARTISTS_ONLY = "EgWKAQIgAWoKEAkQBRAKEAMQBA==";
 
 export const isChannelId = (s: string) => /^UC[\w-]{22}$/.test(s);
 
-async function call(endpoint: "search" | "browse", body: object): Promise<unknown> {
+export async function call(endpoint: "search" | "browse", body: object): Promise<unknown> {
   const res = await fetch(`${API}/${endpoint}?prettyPrint=false`, {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: "https://music.youtube.com" },
@@ -50,11 +50,11 @@ export async function getArtist(id: string): Promise<Artist | null> {
 
 type Runs = { runs?: { text: string }[] };
 type Thumb = { url: string; width?: number };
-type Obj = Record<string, unknown>;
+export type Obj = Record<string, unknown>;
 
-const text = (r: unknown) => ((r as Runs | undefined)?.runs ?? []).map((x) => x.text).join("");
+export const text = (r: unknown) => ((r as Runs | undefined)?.runs ?? []).map((x) => x.text).join("");
 
-function findAll(node: unknown, key: string, out: Obj[] = []): Obj[] {
+export function findAll(node: unknown, key: string, out: Obj[] = []): Obj[] {
   if (Array.isArray(node)) {
     for (const x of node) findAll(x, key, out);
   } else if (node && typeof node === "object") {
@@ -65,7 +65,7 @@ function findAll(node: unknown, key: string, out: Obj[] = []): Obj[] {
   return out;
 }
 
-function biggestThumb(node: unknown): string | null {
+export function biggestThumb(node: unknown): string | null {
   const thumbs = findAll(node, "thumbnails")[0] as unknown as Thumb[] | undefined;
   if (!Array.isArray(thumbs) || !thumbs.length) return null;
   return thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a)).url;

@@ -59,7 +59,7 @@ async function Artist({ params }: { params: Props["params"] }) {
         />
         <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 to-neutral-950/20" />
         <div className="relative mx-auto flex min-h-[clamp(18rem,45vh,30rem)] max-w-6xl flex-col px-5">
-          <Link href="/" className="py-6 text-xl font-extrabold tracking-[-0.04em] text-white/80 hover:text-white sm:py-7">
+          <Link href="/home" className="py-6 text-xl font-extrabold tracking-[-0.04em] text-white/80 hover:text-white sm:py-7">
             datlyrics
           </Link>
           <div className="mt-auto pb-8">
