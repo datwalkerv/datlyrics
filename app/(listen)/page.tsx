@@ -1,5 +1,5 @@
 import Link from "next/link";
-import { DEMO_PLAYLIST_ID, GITHUB_URL } from "@/lib/site";
+import { DEMO_PLAYLIST_ID, DONATE, GITHUB_URL } from "@/lib/site";
 import { HomeSearch } from "./HomeSearch";
 import { SavedShelf } from "./SavedShelf";
 
@@ -219,6 +219,14 @@ export default function Home() {
             Source on GitHub
           </a>
         </p>
+        <div className="mt-2 flex flex-col items-center gap-1 text-xs">
+          <p className="font-semibold uppercase tracking-[0.16em]">Donate</p>
+          {DONATE.map(({ coin, address }) => (
+            <p key={coin} className="break-all">
+              {coin}: <span className="select-all font-mono text-white/50">{address}</span>
+            </p>
+          ))}
+        </div>
       </footer>
     </main>
   );

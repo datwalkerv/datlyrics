@@ -84,6 +84,13 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 - Search terms, song titles and video IDs go through datlyrics' server to YouTube, LRCLIB and iTunes, so your browser doesn't contact those services itself. Responses are cached, and nothing is logged or stored about you.
 - Playback happens in YouTube's embedded player, so YouTube's own privacy policy applies to what you watch.
 
+## 💛 Donate
+
+If you enjoy datlyrics, you can support it with crypto:
+
+- **BTC**: `bc1qf2pnd0uglrq58h0vnvh5p0rajz8w8lgdey00zc`
+- **SOL**: `DNf9BRzBXEfudCw8g6JXQ3wJjZ5Su1ddfL5Pchkcyaf5`
+
 <br>
 
 **By artist for artists. 🎧**  
