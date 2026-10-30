@@ -33,7 +33,8 @@ export function HomeSearch({ compact = false }: { compact?: boolean }) {
             : "rounded-3xl bg-neutral-900/80 shadow-lg shadow-black/20 ring-white/10 focus-within:ring-white/25"
         }`}
       >
-        <SearchBox autoFocus compact={compact} listMaxHeight={`${listMax}px`} />
+        {/* /home leaves focus on the page so playback keys work right away. */}
+        <SearchBox autoFocus={!compact} compact={compact} listMaxHeight={`${listMax}px`} />
       </div>
     </div>
   );

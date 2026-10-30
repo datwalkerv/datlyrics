@@ -67,11 +67,14 @@ export function Player({
   videoId,
   listId,
   minimized = false,
+  playbackKeysWhenMinimized = false,
 }: {
   videoId?: string;
   listId?: string;
   /** Out of sight while home or an artist page is open: keeps playing, shows a mini bar instead. */
   minimized?: boolean;
+  /** Keep play/pause, seek, next/prev, loop, shuffle, save and song/video keys while minimized (/home). */
+  playbackKeysWhenMinimized?: boolean;
 }) {
   const router = useRouter();
   const mountRef = useRef<HTMLDivElement>(null);
@@ -321,16 +324,14 @@ export function Player({
   useMediaSession({ controls, song, artwork, status: snap.status, duration: snap.duration, clock });
 
   // The page (home or artist) has the keyboard while minimized (media keys still work via the Media Session).
-  // While settings are open its buttons get the keys (Space/Enter press them), except Esc to close.
-  useKeyboard(minimized ? {} : settingsOpen ? { Escape: () => setSettingsOpen(false) } : {
+  // Keys that act on playback itself, so they also make sense from /home's mini bar.
+  const playbackKeys = {
     // Media keys, for browsers that deliver them to the page as key presses.
     MediaPlayPause: () => controls.toggle(),
     MediaTrackNext: () => controls.next(),
     MediaTrackPrevious: () => controls.prev(),
     " ": () => controls.toggle(),
     k: () => controls.toggle(),
-    ArrowUp: () => changeVolume(volume + 5, true),
-    ArrowDown: () => changeVolume(volume - 5, true),
     ArrowLeft: () => controls.seekBy(-5),
     ArrowRight: () => controls.seekBy(5),
     j: () => controls.seekBy(-10),
@@ -338,9 +339,16 @@ export function Player({
     r: () => hasQueue && toggleShuffle(),
     n: () => controls.next(),
     p: () => controls.prev(),
-    f: () => toggleFullscreen(),
     v: () => toggleVideo(),
     s: () => toggleSaved(),
+  };
+  // While settings are open its buttons get the keys (Space/Enter press them), except Esc to close.
+  // Minimized, only /home takes playback keys; ↑/↓ stay page scrolling and the rest need the lyrics view.
+  useKeyboard(settingsOpen ? { Escape: () => setSettingsOpen(false) } : minimized ? (playbackKeysWhenMinimized ? playbackKeys : {}) : {
+    ...playbackKeys,
+    ArrowUp: () => changeVolume(volume + 5, true),
+    ArrowDown: () => changeVolume(volume - 5, true),
+    f: () => toggleFullscreen(),
     e: () => toggleEffects(),
     q: () => hasQueue && setQueueOpen((o) => !o),
     "[": () => adjustOffset(-0.25),
@@ -543,6 +551,21 @@ export function Player({
           )}
         </AnimatePresence>
       </main>
+      {/* The lyrics view (and its toasts) is hidden while minimized: show key feedback above the mini bar. */}
+      <AnimatePresence>
+        {minimized && toast && (
+          <motion.div
+            key={toast.id}
+            role="status"
+            className="pointer-events-none fixed bottom-24 left-1/2 z-40 -translate-x-1/2 rounded-full bg-neutral-900/85 px-4 py-2 text-sm font-semibold text-white/85 shadow-xl ring-1 ring-white/10 backdrop-blur-2xl"
+            initial={{ opacity: 0, y: 8 }}
+            animate={{ opacity: 1, y: 0 }}
+            exit={{ opacity: 0 }}
+          >
+            {toast.text}
+          </motion.div>
+        )}
+      </AnimatePresence>
       {minimized && (
         <MiniPlayer
           song={song}

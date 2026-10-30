@@ -91,6 +91,7 @@ export function PlayerHost() {
       videoId={target.videoId}
       listId={target.listId}
       minimized={!onPlay}
+      playbackKeysWhenMinimized={pathname === "/home"}
     />
   );
 }
