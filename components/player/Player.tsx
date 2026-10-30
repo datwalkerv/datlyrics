@@ -11,6 +11,7 @@ import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
 import { MiniPlayer } from "./MiniPlayer";
+import { Settings } from "./Settings";
 import { NowPlaying } from "./NowPlaying";
 import { PlainLyrics } from "./PlainLyrics";
 import { Queue } from "./Queue";
@@ -77,6 +78,7 @@ export function Player({
   const [effectsAutoOff, setEffectsAutoOff] = useState(false);
   const [effectsManual, setEffectsManual] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
+  const [settingsOpen, setSettingsOpen] = useState(false);
   const [loop, setLoop] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   // Which upload each queue entry plays as: its song or its music video, per the current mode.
@@ -108,7 +110,7 @@ export function Player({
 
   const playing = snap.status === "playing" || snap.status === "buffering";
   const hasQueue = (snap.playlist?.length ?? 0) > 1;
-  const idle = useIdle(2500, playing && !queueOpen && !minimized);
+  const idle = useIdle(2500, playing && !queueOpen && !settingsOpen && !minimized);
   const nextId = snap.playlist?.[snap.index + 1] ?? null;
   const trackKey = `${snap.index}:${original ?? "none"}`;
 
@@ -307,7 +309,8 @@ export function Player({
   useMediaSession({ controls, song, artwork, status: snap.status, duration: snap.duration, clock });
 
   // The page (home or artist) has the keyboard while minimized (media keys still work via the Media Session).
-  useKeyboard(minimized ? {} : {
+  // While settings are open its buttons get the keys (Space/Enter press them), except Esc to close.
+  useKeyboard(minimized ? {} : settingsOpen ? { Escape: () => setSettingsOpen(false) } : {
     // Media keys, for browsers that deliver them to the page as key presses.
     MediaPlayPause: () => controls.toggle(),
     MediaTrackNext: () => controls.next(),
@@ -427,16 +430,6 @@ export function Player({
               ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
             </p>
             <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
-            <Link
-              href="/"
-              aria-label="datlyrics landing page"
-              title="datlyrics landing page"
-              className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
-            >
-              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden>
-                <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z" />
-              </svg>
-            </Link>
             <button
               onClick={openSearch}
               aria-label="Search"
@@ -447,10 +440,33 @@ export function Player({
                 <path d="m20 20-3.5-3.5" strokeLinecap="round" />
               </svg>
             </button>
+            <button
+              onClick={() => setSettingsOpen(true)}
+              aria-label="Settings"
+              title="Settings"
+              className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
+            >
+              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.1" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+                <circle cx="12" cy="12" r="3" />
+                <path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 1 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 1 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 1 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 1 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1Z" />
+              </svg>
+            </button>
+            <Link
+              href="/"
+              aria-label="datlyrics landing page"
+              title="datlyrics landing page"
+              className="cursor-show pointer-events-auto flex size-8 items-center justify-center rounded-full bg-white/10 text-white/80 ring-1 ring-white/15 transition hover:bg-white/20 hover:text-white"
+            >
+              <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinejoin="round" aria-hidden>
+                <path d="M4 10.5 12 4l8 6.5V19a1 1 0 0 1-1 1h-4.5v-5.5h-5V20H5a1 1 0 0 1-1-1v-8.5Z" />
+              </svg>
+            </Link>
           </div>
         </div>
 
         <VolumeHud volume={volume} show={volumeHud !== null} />
+
+        <AnimatePresence>{settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}</AnimatePresence>
 
         {!queueOpen && <UpNext nextId={nextId} clock={clock} duration={snap.duration} />}
 

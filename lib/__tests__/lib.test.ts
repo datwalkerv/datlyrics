@@ -1,4 +1,5 @@
 import { describe, expect, it } from "vitest";
+import { parseBackup } from "../backup";
 import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { activeLineIndex, parseLrc } from "../lrc";
@@ -199,5 +200,21 @@ describe("parsePlaylistArtists", () => {
 describe("rankArtists", () => {
   it("ranks by credits, ties in first-seen order", () => {
     expect(rankArtists(["b", "a", "c", "a", "c", "d"], 3)).toEqual(["a", "c", "b"]);
+  });
+});
+
+describe("parseBackup", () => {
+  const file = (data: unknown, app = "datlyrics") => JSON.stringify({ app, version: 1, exportedAt: "2026-10-30", data });
+  it("keeps only datlyrics string entries", () => {
+    expect(parseBackup(file({ "datlyrics:saved": "[]", "datlyrics:volume": "80", other: "x", "datlyrics:bad": 5 }))).toEqual({
+      "datlyrics:saved": "[]",
+      "datlyrics:volume": "80",
+    });
+  });
+  it("rejects anything that isn't a datlyrics backup", () => {
+    expect(parseBackup("not json")).toBeNull();
+    expect(parseBackup(file({}, "other-app"))).toBeNull();
+    expect(parseBackup(file(["datlyrics:saved"]))).toBeNull();
+    expect(parseBackup("null")).toBeNull();
   });
 });

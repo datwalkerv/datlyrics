@@ -61,7 +61,9 @@ export function HomeView() {
       </AnimatePresence>
 
       {/* Search is the page's main action, so it lives in the bar and stays in reach while scrolling. */}
-      <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-neutral-950/60 backdrop-blur-2xl">
+      <header className="sticky top-0 z-30 border-b border-white/[0.06]">
+        {/* The bar's frost sits on its own layer: a blurred header would keep the search's own blur from reaching the page. */}
+        <div aria-hidden className="absolute inset-0 -z-10 bg-neutral-950/60 backdrop-blur-2xl" />
         <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-5 sm:gap-8">
           {/* Already home: the logo goes to what's playing instead. */}
           <Link href={playerHref ?? "/home"} className="shrink-0 text-xl font-extrabold tracking-[-0.04em]">

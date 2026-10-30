@@ -28,8 +28,8 @@ export function HomeSearch({ compact = false }: { compact?: boolean }) {
       <div
         className={`absolute inset-x-0 top-0 z-20 overflow-hidden text-left ring-1 backdrop-blur-2xl transition ${
           compact
-            ? // See-through on the frosted bar; solid only while results drop down over the page.
-              "rounded-[22px] bg-transparent ring-white/15 hover:ring-white/25 focus-within:ring-white/30 has-[ul,button]:bg-neutral-900/95 has-[ul,button]:shadow-2xl has-[ul,button]:shadow-black/50"
+            ? // Frosted glass on the bar; darker (still frosted) while results drop down over the page.
+              "rounded-[22px] bg-white/[0.03] ring-white/15 hover:ring-white/25 focus-within:ring-white/30 has-[ul,button]:bg-neutral-900/70 has-[ul,button]:shadow-2xl has-[ul,button]:shadow-black/50"
             : "rounded-3xl bg-neutral-900/80 shadow-lg shadow-black/20 ring-white/10 focus-within:ring-white/25"
         }`}
       >
