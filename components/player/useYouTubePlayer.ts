@@ -139,6 +139,9 @@ export function useYouTubePlayer(
   const embedOffsetRef = useRef(0);
   const embedSlotRef = useRef(0);
   const armedRef = useRef(false);
+  // The queue index we were on when the embed's playlist went out of date (shuffle, play next);
+  // null while it matches the queue.
+  const staleAtRef = useRef<number | null>(null);
   // Song/video versions already worked out per queue entry, for the current mode.
   const resolvedRef = useRef(new Map<string, string>());
   const resolverRef = useRef<ResolveVersion | null>(null);
@@ -255,6 +258,7 @@ export function useYouTubePlayer(
         .slice(from, from + MAX)
         .map((original, k) => (from + k === i ? id : (cachedVersion(original) ?? original)));
       embedListRef.current = list;
+      staleAtRef.current = null;
       embedOffsetRef.current = from;
       embedSlotRef.current = i - from;
       armedRef.current = false;
@@ -325,6 +329,7 @@ export function useYouTubePlayer(
     indexRef.current = Math.max(queue.indexOf(current), 0);
     // The embed's playlist is in the old order: stop following it, the next track change reloads it.
     embedListRef.current = [];
+    staleAtRef.current = indexRef.current;
     sync();
     prefetchAround(indexRef.current);
   }, [sync, prefetchAround]);
@@ -414,6 +419,14 @@ export function useYouTubePlayer(
               // The embed moved along its playlist by itself (media keys, or end of a track).
               // On loop, that advance is the track ending: replay it instead of following.
               if (loopRef.current) return playIndex(indexRef.current);
+              if (!embedListRef.current.length) {
+                // Its playlist is out of date (shuffle, play next), so it moved to the wrong track:
+                // step our queue the same way and load the right one, unless we've already moved on.
+                const step = embedIndex > embedSlotRef.current ? 1 : -1;
+                embedSlotRef.current = embedIndex;
+                if (staleAtRef.current === indexRef.current) playIndex(indexRef.current + step);
+                return;
+              }
               follow(embedIndex);
             }
             if (e.data === S.ENDED) {
@@ -590,6 +603,7 @@ export function useYouTubePlayer(
           : insertNext(originalRef.current, Math.max(originalRef.current.indexOf(current), 0), ids).queue;
         // The embed's playlist is in the old order: stop following it, the next track change reloads it.
         embedListRef.current = [];
+        staleAtRef.current = moved.index;
         sync();
         prefetchAround(moved.index);
       },
