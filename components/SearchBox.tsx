@@ -17,6 +17,7 @@ export function SearchBox({
   autoFocus = false,
   hint,
   listMaxHeight = "min(56vh, 32rem)",
+  compact = false,
 }: {
   onNavigate?: () => void;
   onEscape?: () => void;
@@ -25,6 +26,8 @@ export function SearchBox({
   hint?: string;
   /** CSS max-height of the results list. */
   listMaxHeight?: string;
+  /** Toolbar size (the /home header) instead of the landing page's hero size. */
+  compact?: boolean;
 }) {
   const router = useRouter();
   const inputRef = useRef<HTMLInputElement>(null);
@@ -75,10 +78,10 @@ export function SearchBox({
 
   return (
     <>
-      <div className="flex items-center gap-3 px-6">
+      <div className={`flex items-center ${compact ? "gap-2.5 px-4" : "gap-3 px-6"}`}>
         <svg
           viewBox="0 0 24 24"
-          className="size-5 shrink-0 text-white/40"
+          className={`shrink-0 text-white/40 ${compact ? "size-4" : "size-5"}`}
           fill="none"
           stroke="currentColor"
           strokeWidth="2.2"
@@ -109,7 +112,9 @@ export function SearchBox({
           }}
           placeholder="Search a song, or paste a YouTube link"
           aria-label="Search songs or paste a YouTube link"
-          className="min-w-0 flex-1 bg-transparent py-5 text-xl text-white placeholder:text-white/30 focus:outline-none"
+          className={`min-w-0 flex-1 bg-transparent text-white placeholder:text-white/30 focus:outline-none ${
+            compact ? "py-2.5 text-[15px] leading-6" : "py-5 text-xl"
+          }`}
           spellCheck={false}
           autoComplete="off"
         />

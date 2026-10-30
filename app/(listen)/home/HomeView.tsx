@@ -62,13 +62,13 @@ export function HomeView() {
 
       {/* Search is the page's main action, so it lives in the bar and stays in reach while scrolling. */}
       <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-neutral-950/60 backdrop-blur-2xl">
-        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3 sm:gap-8">
+        <div className="mx-auto flex h-16 max-w-6xl items-center gap-4 px-5 sm:gap-8">
           {/* Already home: the logo goes to what's playing instead. */}
           <Link href={playerHref ?? "/home"} className="shrink-0 text-xl font-extrabold tracking-[-0.04em]">
             datlyrics
           </Link>
-          <div className="flex min-w-0 flex-1 justify-center [&>div]:mt-0">
-            <HomeSearch />
+          <div className="flex min-w-0 flex-1 justify-center">
+            <HomeSearch compact />
           </div>
           {/* Balances the logo so the search sits in the middle. */}
           <span aria-hidden className="w-[88px] shrink-0 max-lg:hidden" />
@@ -272,3 +272,4 @@ function useReleases(artists: string[]): Release[] | null {
   }, [query]);
   return releases;
 }
+
