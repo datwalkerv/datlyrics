@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useState, type ReactNode } from "react";
 import type { HistoryEntry } from "@/lib/history";
+import { CoverImage } from "@/components/player/CoverImage";
 import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
 import { playHere } from "./PlayerHost";
 import {
@@ -130,10 +131,9 @@ export function SavedCard({
       <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`}>
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
           {item.image && (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img
+            // Same fallbacks as the player's cover: a missing max-res YouTube thumbnail drops to hqdefault.
+            <CoverImage
               src={item.image}
-              alt=""
               loading="lazy"
               className="h-full w-full object-cover"
               onError={() => item.kind === "playlist" && item.id !== SAVED_LIST_ID && refreshPlaylistCover(item.id)}
