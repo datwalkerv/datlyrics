@@ -4,8 +4,8 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { ArtistRelease } from "@/lib/artist-source";
-import { useHistory, type HistoryEntry } from "@/lib/history";
-import { PINNED, SAVED_LIST_ID, isPinned, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
+import { useHistory } from "@/lib/history";
+import { PINNED, SAVED_LIST_ID, isPinned, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
 import type { RadioTrack } from "@/lib/video-source";
 import { HomeSearch } from "../HomeSearch";
 import { playHere, usePlayerHref } from "@/components/player/remote";
@@ -28,13 +28,6 @@ export function HomeView() {
   const radio = useRadio(seed);
   const recentIds = new Set(recent.map((h) => h.id));
   const recommended = radio?.filter((t) => !recentIds.has(t.id)).slice(0, 16);
-
-  // Where you left off in each playlist. Saved ones resume from their own card; the rest lead the shelf.
-  const lastInList = distinct(history.filter((h) => h.listId), (h) => h.listId!);
-  const resume = new Map(lastInList.map((h) => [h.listId!, h]));
-  const isOnShelf = (listId: string) =>
-    listId === SAVED_LIST_ID || isPinned("playlist", listId) || saved.some((x) => x.kind === "playlist" && x.id === listId);
-  const unsaved = lastInList.filter((h) => !isOnShelf(h.listId!)).slice(0, 6);
 
   // From your library only, not what's playing: it stays put until you save or remove something.
   const releases = useReleases(libraryQuery(saved));
@@ -110,14 +103,7 @@ export function HomeView() {
         )}
 
         <Section title="Your playlists">
-          <SavedShelf
-            variant="home"
-            resume={resume}
-            onCardMenu={openMenu}
-            leading={unsaved.map((h) => (
-              <ContinueCard key={h.listId} entry={h} onContextMenu={openMenu} />
-            ))}
-          />
+          <SavedShelf variant="home" onCardMenu={openMenu} />
         </Section>
 
         {releases !== undefined && (releases === null || releases.singles.length + releases.albums.length > 0) && (
@@ -195,48 +181,6 @@ function Skeletons() {
       <div className="mt-1.5 h-3 w-1/2 rounded bg-white/[0.04]" />
     </div>
   ));
-}
-
-/** A playlist you were in the middle of but didn't save: its cover and name, resuming at your track. */
-function ContinueCard({
-  entry,
-  onContextMenu,
-}: {
-  entry: HistoryEntry;
-  onContextMenu: (e: React.MouseEvent, item: SavedItem) => void;
-}) {
-  const listId = entry.listId!;
-  const [list, setList] = useState<Pick<SavedItem, "title" | "image" | "badge"> | null>(null);
-
-  useEffect(() => {
-    let alive = true;
-    resolveSaved({ listId })
-      .then((p) => alive && setList(p))
-      .catch(() => {});
-    return () => {
-      alive = false;
-    };
-  }, [listId]);
-
-  const item: SavedItem = {
-    kind: "playlist",
-    id: listId,
-    // Until (or unless) the playlist loads, show the track.
-    title: list?.title ?? entry.title,
-    subtitle: `Resume · ${entry.title}`,
-    image: list?.image ?? entry.image,
-    savedAt: 0,
-    badge: list?.badge,
-  };
-  return (
-    <SavedCard
-      item={item}
-      className="w-36 sm:w-40"
-      pinned
-      onPlay={() => playHere({ listId, videoId: entry.id })}
-      onContextMenu={(e) => onContextMenu(e, item)}
-    />
-  );
 }
 
 const songItem = (id: string, title: string, artist: string, image: string | null): SavedItem => ({

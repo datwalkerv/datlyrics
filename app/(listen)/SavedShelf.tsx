@@ -2,8 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState, type ReactNode } from "react";
-import type { HistoryEntry } from "@/lib/history";
+import { useEffect, useState } from "react";
 import { CoverImage } from "@/components/player/CoverImage";
 import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
 import { playHere } from "@/components/player/remote";
@@ -25,24 +24,19 @@ import {
 /** Saved songs and playlists (kept in localStorage) as one-click cards: centered on the landing page, left-aligned and larger on /home. */
 export function SavedShelf({
   variant = "landing",
-  leading,
-  resume,
   onCardMenu,
 }: {
   variant?: "landing" | "home";
-  /** Cards shown before the saved ones (/home: playlists you were in that aren't saved). */
-  leading?: ReactNode;
-  /** Where you left off in each playlist, by list id: its card resumes there. */
-  resume?: Map<string, HistoryEntry>;
   /** Right-click on a card (/home's play next / save menu). */
   onCardMenu?: (e: React.MouseEvent, item: SavedItem) => void;
 }) {
   const home = variant === "home";
   const width = home ? "w-36 sm:w-40" : "w-28";
-  const pinned = usePinned();
+  // /home shows only the user's own playlists, not the app's pinned ones.
+  const pinned = usePinned(!home);
   // A pinned item the user also saved shows once, as the pinned card.
   const saved = useSaved();
-  const items = saved.filter((x) => x.kind === "playlist" && !isPinned(x.kind, x.id));
+  const items = saved.filter((x) => x.kind === "playlist" && (home || !isPinned(x.kind, x.id)));
   const songCount = saved.filter((x) => x.kind === "song").length;
   const savedSongs: SavedItem = {
     kind: "playlist",
@@ -56,14 +50,9 @@ export function SavedShelf({
   // On /home it plays in the mini bar; the landing page opens the lyrics.
   const play = (item: SavedItem) => {
     if (!home) return router.push(savedHref(item));
-    const at = item.kind === "playlist" ? resume?.get(item.id) : undefined;
-    playHere(at ? { listId: item.id, videoId: at.id } : savedTarget(item));
+    playHere(savedTarget(item));
   };
   const menu = (item: SavedItem) => onCardMenu && ((e: React.MouseEvent) => onCardMenu(e, item));
-  const withResume = (item: SavedItem): SavedItem => {
-    const at = item.kind === "playlist" ? resume?.get(item.id) : undefined;
-    return at ? { ...item, subtitle: `Resume · ${at.title}` } : item;
-  };
 
   // Playlists saved before covers were fetched show their first video instead; upgrade them once.
   useEffect(() => {
@@ -75,11 +64,10 @@ export function SavedShelf({
   return (
     <section className={home ? "w-full" : "mt-12 w-full max-w-3xl"} aria-label="Saved songs and playlists">
       <div className={`flex flex-wrap gap-4 ${home ? "sm:gap-5" : "justify-center"}`}>
-        {leading}
         {pinned.map((item) => (
-          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={withResume(item)} className={width} pinned onPlay={() => play(item)} onContextMenu={menu(item)} />
+          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} className={width} pinned onPlay={() => play(item)} onContextMenu={menu(item)} />
         ))}
-        {songCount > 0 && <SavedCard item={withResume(savedSongs)} className={width} pinned onPlay={() => play(savedSongs)} onContextMenu={menu(savedSongs)} />}
+        {songCount > 0 && <SavedCard item={savedSongs} className={width} pinned onPlay={() => play(savedSongs)} onContextMenu={menu(savedSongs)} />}
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <motion.div
@@ -90,7 +78,7 @@ export function SavedShelf({
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.25 }}
             >
-              <SavedCard item={withResume(item)} className={width} onPlay={() => play(item)} onContextMenu={menu(item)} />
+              <SavedCard item={item} className={width} onPlay={() => play(item)} onContextMenu={menu(item)} />
             </motion.div>
           ))}
         </AnimatePresence>
@@ -101,9 +89,10 @@ export function SavedShelf({
 }
 
 /** The pinned items' cards, fetched fresh each visit (titles change, cover URLs expire). */
-function usePinned(): SavedItem[] {
+function usePinned(enabled: boolean): SavedItem[] {
   const [items, setItems] = useState<SavedItem[]>([]);
   useEffect(() => {
+    if (!enabled) return;
     let alive = true;
     Promise.all(
       PINNED.map((p) =>
@@ -115,7 +104,7 @@ function usePinned(): SavedItem[] {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [enabled]);
   return items;
 }
 

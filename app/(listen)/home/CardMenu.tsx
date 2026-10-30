@@ -88,7 +88,7 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
   const toggleSave = () => {
     if (saved) return removeItem(item.kind, item.id);
     if (isSong) return saveItem({ kind: "song", id: item.id, title: item.title, subtitle: item.subtitle, image: item.image });
-    // Cards can show "Resume · …" or "Artist · year" as subtitles: save the list's own details.
+    // Cards can show "Artist · year" as subtitles: save the list's own details.
     resolveSaved({ listId: item.id })
       .then(saveItem)
       .catch(() => {});
