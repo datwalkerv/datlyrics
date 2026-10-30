@@ -2,7 +2,8 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
+import type { HistoryEntry } from "@/lib/history";
 import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
 import { playHere } from "./PlayerHost";
 import {
@@ -21,7 +22,17 @@ import {
 } from "@/lib/saved";
 
 /** Saved songs and playlists (kept in localStorage) as one-click cards: centered on the landing page, left-aligned and larger on /home. */
-export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "home" }) {
+export function SavedShelf({
+  variant = "landing",
+  leading,
+  resume,
+}: {
+  variant?: "landing" | "home";
+  /** Cards shown before the saved ones (/home: playlists you were in that aren't saved). */
+  leading?: ReactNode;
+  /** Where you left off in each playlist, by list id: its card resumes there. */
+  resume?: Map<string, HistoryEntry>;
+}) {
   const home = variant === "home";
   const width = home ? "w-36 sm:w-40" : "w-28";
   const pinned = usePinned();
@@ -39,7 +50,15 @@ export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "hom
   };
   const router = useRouter();
   // On /home it plays in the mini bar; the landing page opens the lyrics.
-  const play = (item: SavedItem) => (home ? playHere(savedTarget(item)) : router.push(savedHref(item)));
+  const play = (item: SavedItem) => {
+    if (!home) return router.push(savedHref(item));
+    const at = item.kind === "playlist" ? resume?.get(item.id) : undefined;
+    playHere(at ? { listId: item.id, videoId: at.id } : savedTarget(item));
+  };
+  const withResume = (item: SavedItem): SavedItem => {
+    const at = item.kind === "playlist" ? resume?.get(item.id) : undefined;
+    return at ? { ...item, subtitle: `Resume · ${at.title}` } : item;
+  };
 
   // Playlists saved before covers were fetched show their first video instead; upgrade them once.
   useEffect(() => {
@@ -51,10 +70,11 @@ export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "hom
   return (
     <section className={home ? "w-full" : "mt-12 w-full max-w-3xl"} aria-label="Saved songs and playlists">
       <div className={`flex flex-wrap gap-4 ${home ? "sm:gap-5" : "justify-center"}`}>
+        {leading}
         {pinned.map((item) => (
-          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={item} className={width} pinned onPlay={() => play(item)} />
+          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={withResume(item)} className={width} pinned onPlay={() => play(item)} />
         ))}
-        {songCount > 0 && <SavedCard item={savedSongs} className={width} pinned onPlay={() => play(savedSongs)} />}
+        {songCount > 0 && <SavedCard item={withResume(savedSongs)} className={width} pinned onPlay={() => play(savedSongs)} />}
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <motion.div
@@ -65,7 +85,7 @@ export function SavedShelf({ variant = "landing" }: { variant?: "landing" | "hom
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.25 }}
             >
-              <SavedCard item={item} className={width} onPlay={() => play(item)} />
+              <SavedCard item={withResume(item)} className={width} onPlay={() => play(item)} />
             </motion.div>
           ))}
         </AnimatePresence>

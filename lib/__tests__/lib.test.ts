@@ -1,9 +1,9 @@
 import { describe, expect, it } from "vitest";
-import { parseArtist } from "../artist-source";
+import { mergeReleases, parseArtist } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseYouTubeUrl } from "../parse-youtube-url";
-import { parseDiscover } from "../discover-source";
+import { mergeResults } from "../search-source";
 import { parseRadio } from "../video-source";
 
 describe("parseYouTubeUrl", () => {
@@ -162,56 +162,23 @@ describe("parseRadio", () => {
   });
 });
 
-describe("parseDiscover", () => {
-  const runs = (...t: string[]) => ({ runs: t.map((text) => ({ text })) });
-  const thumbs = (url: string) => ({ thumbnails: [{ url: `${url}=w60-h60-l90`, width: 60 }, { url: `${url}=w120-h120-l90`, width: 120 }] });
-  const shelf = (title: string, contents: object[]) => ({
-    musicCarouselShelfRenderer: { header: { musicCarouselShelfBasicHeaderRenderer: { title: runs(title) } }, contents },
+describe("mergeResults", () => {
+  const r = (id: string) => ({ id, title: id, channel: "", duration: "3:00" });
+  it("puts songs first and fills the rest with videos it doesn't already have", () => {
+    const songs = ["s1", "s2", "s3", "s4", "s5", "s6", "s7"].map(r);
+    const videos = ["s1", "v1", "v2", "v3"].map(r);
+    expect(mergeResults(songs, videos).map((x) => x.id)).toEqual(["s1", "s2", "s3", "s4", "s5", "s6", "v1", "v2"]);
   });
-  // Trimmed from a real music.youtube.com FEmusic_home `browse` response.
-  const response = {
-    contents: {
-      sectionListRenderer: {
-        contents: [
-          shelf("Quick picks", [
-            {
-              musicResponsiveListItemRenderer: {
-                thumbnail: { musicThumbnailRenderer: { thumbnail: thumbs("img:beat") } },
-                flexColumns: [
-                  { musicResponsiveListItemFlexColumnRenderer: { text: { runs: [{ text: "Beat It", navigationEndpoint: { watchEndpoint: { videoId: "kOn-HdEg6AQ" } } }] } } },
-                  { musicResponsiveListItemFlexColumnRenderer: { text: runs("Michael Jackson", " • ", "Thriller") } },
-                ],
-              },
-            },
-          ]),
-          shelf("New releases", [
-            {
-              musicTwoRowItemRenderer: {
-                title: runs("Naked"),
-                subtitle: runs("Single", " • ", "Someone"),
-                thumbnailRenderer: { musicThumbnailRenderer: { thumbnail: thumbs("img:naked") } },
-                menu: { items: [{ navigationEndpoint: { watchPlaylistEndpoint: { playlistId: "OLAK5uy_naked" } } }] },
-              },
-            },
-            // An artist card: nothing to play, so it's left out.
-            { musicTwoRowItemRenderer: { title: runs("Some Artist"), subtitle: runs("Artist") } },
-          ]),
-          shelf("Nothing playable", [{ musicTwoRowItemRenderer: { title: runs("x") } }]),
-        ],
-      },
-    },
-  };
+  it("falls back to videos when there are no songs", () => {
+    expect(mergeResults([], ["v1", "v2"].map(r)).map((x) => x.id)).toEqual(["v1", "v2"]);
+  });
+});
 
-  it("keeps each shelf's playable songs and playlists, with sharp covers", () => {
-    expect(parseDiscover(response)).toEqual([
-      {
-        title: "Quick picks",
-        items: [{ kind: "song", id: "kOn-HdEg6AQ", title: "Beat It", subtitle: "Michael Jackson", image: "img:beat=w544-h544-l90" }],
-      },
-      {
-        title: "New releases",
-        items: [{ kind: "playlist", id: "OLAK5uy_naked", title: "Naked", subtitle: "Single • Someone", image: "img:naked=w544-h544-l90" }],
-      },
-    ]);
+describe("mergeReleases", () => {
+  const rel = (listId: string, year: string) => ({ listId, title: listId, year, image: null });
+  it("lists newest first, taking turns between artists within a year, without repeats", () => {
+    const a = [rel("a26", "2026"), rel("a26b", "2026"), rel("a24", "2024")];
+    const b = [rel("b26", "2026"), rel("b25", "2025"), rel("a26", "2026")];
+    expect(mergeReleases([a, b]).map((r) => r.listId)).toEqual(["a26", "b26", "a26b", "b25", "a24"]);
   });
 });

@@ -1,4 +1,5 @@
 import { cacheLife } from "next/cache";
+import { call, findAll, text } from "./artist-source";
 
 export type SearchResult = {
   id: string;
@@ -27,6 +28,34 @@ function collect(node: unknown, out: VideoRenderer[]) {
     if (o.videoRenderer) out.push(o.videoRenderer as VideoRenderer);
     for (const v of Object.values(o)) collect(v, out);
   }
+}
+
+const SONGS_ONLY = "EgWKAQIIAWoKEAkQBRAKEAMQBA==";
+
+/** YouTube Music's song results: real tracks (and their album audio), no covers, clips or reaction videos. */
+export async function searchSongs(query: string): Promise<SearchResult[]> {
+  "use cache";
+  cacheLife("hours");
+
+  const results: SearchResult[] = [];
+  for (const row of findAll(await call("search", { query, params: SONGS_ONLY }), "musicResponsiveListItemRenderer")) {
+    const id = (row.playlistItemData as { videoId?: string } | undefined)?.videoId;
+    const cols = findAll(row.flexColumns, "musicResponsiveListItemFlexColumnRenderer").map((c) => text(c.text));
+    // "Artist • Album • 3:40"
+    const parts = (cols[1] ?? "").split(" • ");
+    const duration = parts.at(-1) ?? "";
+    if (!id || !cols[0] || !/^\d+(:\d\d)+$/.test(duration)) continue;
+    results.push({ id, title: cols[0], channel: parts[0], duration });
+  }
+  return results;
+}
+
+/** Songs first, then videos for what YouTube Music doesn't have (or anything that isn't a song). */
+export function mergeResults(songs: SearchResult[], videos: SearchResult[], max = 8): SearchResult[] {
+  const out = songs.slice(0, max - 2);
+  const seen = new Set(out.map((r) => r.id));
+  for (const v of videos) if (out.length < max && !seen.has(v.id)) out.push(v);
+  return out;
 }
 
 export async function searchVideos(query: string): Promise<SearchResult[]> {

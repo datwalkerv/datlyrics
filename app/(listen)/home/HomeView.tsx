@@ -1,10 +1,11 @@
 "use client";
 
+import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
-import type { DiscoverShelf } from "@/lib/discover-source";
+import { useEffect, useState, type ReactNode } from "react";
+import type { ArtistRelease } from "@/lib/artist-source";
 import { useHistory, type HistoryEntry } from "@/lib/history";
-import { SAVED_LIST_ID, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
+import { SAVED_LIST_ID, isPinned, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
 import type { RadioTrack } from "@/lib/video-source";
 import { HomeSearch } from "../HomeSearch";
 import { playHere, usePlayerHref } from "../PlayerHost";
@@ -12,119 +13,131 @@ import { SavedCard, SavedShelf } from "../SavedShelf";
 
 const CARD = "w-36 snap-start sm:w-40";
 
-/** The app's home for returning listeners: search, history, your playlists, recommendations, discovery. */
+type Release = ArtistRelease & { artist: string };
+
+/** The app's home for returning listeners: search, recommendations, history, your playlists, new releases. */
 export function HomeView() {
   const history = useHistory();
   const saved = useSaved();
-  const greeting = useGreeting();
   const playerHref = usePlayerHref();
 
-  const playlists = distinct(history.filter((h) => h.listId), (h) => h.listId!).slice(0, 8);
   const recent = distinct(history, (h) => h.id).slice(0, 20);
   // Recommendations follow what you played last, or else what you saved last.
   const seed = history[0]?.id ?? [...saved].reverse().find((x) => x.kind === "song")?.id ?? null;
   const radio = useRadio(seed);
   const recentIds = new Set(recent.map((h) => h.id));
   const recommended = radio?.filter((t) => !recentIds.has(t.id)).slice(0, 16);
-  const discover = useDiscover();
+
+  // Where you left off in each playlist. Saved ones resume from their own card; the rest lead the shelf.
+  const lastInList = distinct(history.filter((h) => h.listId), (h) => h.listId!);
+  const resume = new Map(lastInList.map((h) => [h.listId!, h]));
+  const isOnShelf = (listId: string) =>
+    listId === SAVED_LIST_ID || isPinned("playlist", listId) || saved.some((x) => x.kind === "playlist" && x.id === listId);
+  const unsaved = lastInList.filter((h) => !isOnShelf(h.listId!)).slice(0, 6);
+
+  const artists = topArtists(history, saved);
+  const releases = useReleases(artists);
   const glow = history[0]?.image ?? null;
 
   const play = (item: Pick<SavedItem, "kind" | "id">) => playHere(savedTarget(item));
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden bg-neutral-950 pb-36 text-white">
+    <main className="relative min-h-dvh overflow-x-clip bg-neutral-950 pb-36 text-white">
       {/* What you played last tints the page, like the player's own backdrop. */}
-      {glow && (
-        // eslint-disable-next-line @next/next/no-img-element
-        <img
-          src={glow}
-          alt=""
-          aria-hidden
-          className="pointer-events-none absolute -top-48 left-1/2 w-[1100px] max-w-none -translate-x-1/2 opacity-25 blur-[110px]"
-        />
-      )}
-      <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:py-7">
-        {/* Already home: the logo goes to what's playing instead. */}
-        <Link href={playerHref ?? "/home"} className="text-xl font-extrabold tracking-[-0.04em]">
-          datlyrics
-        </Link>
+      <AnimatePresence>
+        {glow && (
+          <motion.img
+            key={glow}
+            src={glow}
+            alt=""
+            aria-hidden
+            initial={{ opacity: 0 }}
+            animate={{ opacity: 0.25 }}
+            exit={{ opacity: 0 }}
+            transition={{ duration: 1.2 }}
+            className="pointer-events-none absolute -top-40 left-1/2 w-[1100px] max-w-none -translate-x-1/2 blur-[110px]"
+          />
+        )}
+      </AnimatePresence>
+
+      {/* Search is the page's main action, so it lives in the bar and stays in reach while scrolling. */}
+      <header className="sticky top-0 z-30 border-b border-white/[0.06] bg-neutral-950/60 backdrop-blur-2xl">
+        <div className="mx-auto flex max-w-6xl items-center gap-4 px-5 py-3 sm:gap-8">
+          {/* Already home: the logo goes to what's playing instead. */}
+          <Link href={playerHref ?? "/home"} className="shrink-0 text-xl font-extrabold tracking-[-0.04em]">
+            datlyrics
+          </Link>
+          <div className="flex min-w-0 flex-1 justify-center [&>div]:mt-0">
+            <HomeSearch />
+          </div>
+          {/* Balances the logo so the search sits in the middle. */}
+          <span aria-hidden className="w-[88px] shrink-0 max-lg:hidden" />
+        </div>
       </header>
 
-      <section className="relative z-20 mx-auto max-w-6xl px-5 pt-4 sm:pt-8">
-        <h1 className="text-[clamp(2.5rem,6vw,4.5rem)] font-extrabold leading-[0.95] tracking-[-0.05em]">{greeting}</h1>
-        <p className="mt-4 text-lg text-white/50">Search a song, paste a link, or pick up where you left off.</p>
-        <HomeSearch />
-      </section>
-
-      <div className="relative z-10 mx-auto mt-16 flex max-w-6xl flex-col gap-14 px-5">
-        {playlists.length > 0 && (
-          <Section title="Continue listening">
-            <Row>
-              {playlists.map((h) => (
-                <ContinueCard key={h.listId} entry={h} />
-              ))}
-            </Row>
-          </Section>
-        )}
-
-        <Section title="Your playlists">
-          <SavedShelf variant="home" />
-        </Section>
-
-        {recent.length > 0 && (
-          <Section title="Recently played">
-            <Row>
-              {recent.map((h) => (
-                <SavedCard key={h.id} item={songItem(h.id, h.title, h.artist, h.image)} className={CARD} pinned onPlay={() => play({ kind: "song", id: h.id })} />
-              ))}
-            </Row>
-          </Section>
-        )}
-
+      <div className="relative z-10 mx-auto mt-10 flex max-w-6xl flex-col gap-14 px-5 sm:mt-14">
         {seed && recommended?.length !== 0 && (
           <Section title="Recommended for you">
             <Row>
               {recommended
                 ? recommended.map((t) => (
-                    <SavedCard key={t.id} item={songItem(t.id, t.title, t.artist, t.image)} className={CARD} pinned onPlay={() => play({ kind: "song", id: t.id })} />
+                    <Animated key={t.id}>
+                      <SavedCard item={songItem(t.id, t.title, t.artist, t.image)} className={CARD} pinned onPlay={() => play({ kind: "song", id: t.id })} />
+                    </Animated>
                   ))
                 : <Skeletons />}
             </Row>
           </Section>
         )}
 
-        {discover === null ? (
-          <Section title="Discover">
+        {recent.length > 0 && (
+          <Section title="Recently played">
             <Row>
-              <Skeletons />
+              {recent.map((h) => (
+                <Animated key={h.id}>
+                  <SavedCard item={songItem(h.id, h.title, h.artist, h.image)} className={CARD} pinned onPlay={() => play({ kind: "song", id: h.id })} />
+                </Animated>
+              ))}
             </Row>
           </Section>
-        ) : (
-          discover.map((shelf, i) => (
-            <Section key={shelf.title} eyebrow={i === 0 ? "Discover" : undefined} title={shelf.title}>
-              <Row>
-                {shelf.items.map((item) => (
-                  <SavedCard
-                    key={`${item.kind}:${item.id}`}
-                    item={{ ...item, savedAt: 0 }}
-                    className={CARD}
-                    pinned
-                    onPlay={() => play(item)}
-                  />
-                ))}
-              </Row>
-            </Section>
-          ))
+        )}
+
+        <Section title="Your playlists">
+          <SavedShelf
+            variant="home"
+            resume={resume}
+            leading={unsaved.map((h) => (
+              <ContinueCard key={h.listId} entry={h} />
+            ))}
+          />
+        </Section>
+
+        {artists.length > 0 && releases?.length !== 0 && (
+          <Section title="New from your artists">
+            <Row>
+              {releases
+                ? releases.map((r) => (
+                    <Animated key={r.listId}>
+                      <SavedCard
+                        item={{ kind: "playlist", id: r.listId, title: r.title, subtitle: [r.artist, r.year].filter(Boolean).join(" · "), image: r.image, savedAt: 0 }}
+                        className={CARD}
+                        pinned
+                        onPlay={() => play({ kind: "playlist", id: r.listId })}
+                      />
+                    </Animated>
+                  ))
+                : <Skeletons />}
+            </Row>
+          </Section>
         )}
       </div>
     </main>
   );
 }
 
-function Section({ eyebrow, title, children }: { eyebrow?: string; title: string; children: ReactNode }) {
+function Section({ title, children }: { title: string; children: ReactNode }) {
   return (
     <section aria-label={title}>
-      {eyebrow && <p className="mb-2 text-xs font-medium uppercase tracking-[0.2em] text-white/30">{eyebrow}</p>}
       <h2 className="mb-5 text-2xl font-extrabold tracking-[-0.03em] sm:text-3xl">{title}</h2>
       {children}
     </section>
@@ -135,14 +148,33 @@ function Section({ eyebrow, title, children }: { eyebrow?: string; title: string
 function Row({ children }: { children: ReactNode }) {
   return (
     <div className="-mx-5 snap-x scroll-px-5 overflow-x-auto px-5 py-1 [mask-image:linear-gradient(to_right,transparent,#000_1.25rem,#000_calc(100%-1.25rem),transparent)] [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
-      <div className="flex w-max gap-4 sm:gap-5">{children}</div>
+      <div className="flex w-max gap-4 sm:gap-5">
+        <AnimatePresence initial={false} mode="popLayout">
+          {children}
+        </AnimatePresence>
+      </div>
     </div>
+  );
+}
+
+/** A card that slides into place when the row changes (a new play moves to the front, fresh picks fade in). */
+function Animated({ children }: { children: ReactNode }) {
+  return (
+    <motion.div
+      layout
+      initial={{ opacity: 0, scale: 0.92, y: 8 }}
+      animate={{ opacity: 1, scale: 1, y: 0 }}
+      exit={{ opacity: 0, scale: 0.92 }}
+      transition={{ duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+    >
+      {children}
+    </motion.div>
   );
 }
 
 function Skeletons() {
   return Array.from({ length: 7 }, (_, i) => (
-    <div key={i} className={CARD} aria-hidden>
+    <div key={`skeleton:${i}`} className={CARD} aria-hidden>
       <div className="aspect-square w-full animate-pulse rounded-2xl bg-white/[0.06]" />
       <div className="mt-2.5 h-3.5 w-3/4 rounded bg-white/[0.06]" />
       <div className="mt-1.5 h-3 w-1/2 rounded bg-white/[0.04]" />
@@ -150,15 +182,12 @@ function Skeletons() {
   ));
 }
 
-/** A playlist you were in the middle of: its cover and name, resuming at the track you were on. */
+/** A playlist you were in the middle of but didn't save: its cover and name, resuming at your track. */
 function ContinueCard({ entry }: { entry: HistoryEntry }) {
   const listId = entry.listId!;
-  const [list, setList] = useState<Pick<SavedItem, "title" | "image"> | null>(
-    listId === SAVED_LIST_ID ? { title: "Saved", image: "/saved.svg" } : null,
-  );
+  const [list, setList] = useState<Pick<SavedItem, "title" | "image"> | null>(null);
 
   useEffect(() => {
-    if (listId === SAVED_LIST_ID) return;
     let alive = true;
     resolveSaved({ listId })
       .then((p) => alive && setList(p))
@@ -177,14 +206,7 @@ function ContinueCard({ entry }: { entry: HistoryEntry }) {
     image: list?.image ?? entry.image,
     savedAt: 0,
   };
-  return (
-    <SavedCard
-      item={item}
-      className={CARD}
-      pinned
-      onPlay={() => playHere({ listId, videoId: entry.id })}
-    />
-  );
+  return <SavedCard item={item} className="w-36 sm:w-40" pinned onPlay={() => playHere({ listId, videoId: entry.id })} />;
 }
 
 const songItem = (id: string, title: string, artist: string, image: string | null): SavedItem => ({
@@ -199,6 +221,21 @@ const songItem = (id: string, title: string, artist: string, image: string | nul
 function distinct<T>(items: T[], key: (x: T) => string): T[] {
   const seen = new Set<string>();
   return items.filter((x) => !seen.has(key(x)) && !!seen.add(key(x)));
+}
+
+/** The artists you play and save most (saves count double), main artist only: "A, B feat. C" is A. */
+function topArtists(history: HistoryEntry[], saved: SavedItem[], max = 4): string[] {
+  const score = new Map<string, { name: string; n: number }>();
+  const add = (raw: string, n: number) => {
+    const name = raw.split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0].trim();
+    if (!name) return;
+    const key = name.toLowerCase();
+    const cur = score.get(key) ?? { name, n: 0 };
+    score.set(key, { name: cur.name, n: cur.n + n });
+  };
+  for (const h of history) add(h.artist, 1);
+  for (const s of saved) if (s.kind === "song") add(s.subtitle, 2);
+  return [...score.values()].sort((a, b) => b.n - a.n).slice(0, max).map((x) => x.name);
 }
 
 /** Songs related to `seed`. Keeps showing the last batch while a new seed loads; null until the first. */
@@ -218,27 +255,20 @@ function useRadio(seed: string | null): RadioTrack[] | null {
   return tracks;
 }
 
-/** YouTube Music's home shelves; null while loading, empty if they couldn't be loaded. */
-function useDiscover(): DiscoverShelf[] | null {
-  const [shelves, setShelves] = useState<DiscoverShelf[] | null>(null);
+/** Latest albums and singles from these artists. Keeps the last list while a new one loads; null until the first. */
+function useReleases(artists: string[]): Release[] | null {
+  const [releases, setReleases] = useState<Release[] | null>(null);
+  const query = new URLSearchParams(artists.map((a) => ["artist", a])).toString();
   useEffect(() => {
+    if (!query) return;
     let alive = true;
-    fetch("/api/discover")
-      .then((res) => (res.ok ? (res.json() as Promise<{ shelves: DiscoverShelf[] }>) : { shelves: [] }))
-      .then((data) => alive && setShelves(data.shelves))
-      .catch(() => alive && setShelves([]));
+    fetch(`/api/releases?${query}`)
+      .then((res) => (res.ok ? (res.json() as Promise<{ releases: Release[] }>) : { releases: [] }))
+      .then((data) => alive && setReleases(data.releases))
+      .catch(() => alive && setReleases([]));
     return () => {
       alive = false;
     };
-  }, []);
-  return shelves;
-}
-
-const noSubscribe = () => () => {};
-const greetingFor = (hour: number) =>
-  hour >= 5 && hour < 12 ? "Good morning" : hour >= 12 && hour < 18 ? "Good afternoon" : "Good evening";
-
-/** By the visitor's own clock, so it's only known in the browser. */
-function useGreeting() {
-  return useSyncExternalStore(noSubscribe, () => greetingFor(new Date().getHours()), () => "Welcome back");
+  }, [query]);
+  return releases;
 }

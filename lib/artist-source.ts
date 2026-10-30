@@ -50,7 +50,7 @@ export async function getArtist(id: string): Promise<Artist | null> {
 
 type Runs = { runs?: { text: string }[] };
 type Thumb = { url: string; width?: number };
-export type Obj = Record<string, unknown>;
+type Obj = Record<string, unknown>;
 
 export const text = (r: unknown) => ((r as Runs | undefined)?.runs ?? []).map((x) => x.text).join("");
 
@@ -110,4 +110,18 @@ export function parseArtist(data: unknown): Artist | null {
     albums: carousel("Albums"),
     singles: carousel("Singles & EPs"),
   };
+}
+
+/**
+ * Several artists' releases as one list, newest year first. Artists take turns within a year,
+ * so one prolific artist doesn't fill the row.
+ */
+export function mergeReleases<T extends ArtistRelease>(lists: T[][], max = 20): T[] {
+  const turns: T[] = [];
+  for (let i = 0; turns.length < lists.flat().length; i++) for (const list of lists) if (list[i]) turns.push(list[i]);
+  const seen = new Set<string>();
+  return turns
+    .filter((r) => !seen.has(r.listId) && !!seen.add(r.listId))
+    .sort((a, b) => Number(b.year || 0) - Number(a.year || 0))
+    .slice(0, max);
 }
