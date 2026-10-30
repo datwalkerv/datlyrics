@@ -576,18 +576,18 @@ export function useYouTubePlayer(
       },
       getTime: () => playerRef.current?.getCurrentTime() ?? 0,
       next: () => playIndex(indexRef.current + 1),
-      /** Queue a track right after the current one, in shuffled and playlist order alike. */
-      playNext: (id: string) => {
+      /** Queue tracks right after the current one, in shuffled and playlist order alike. */
+      playNext: (ids: string[]) => {
         const i = indexRef.current;
         const current = queueRef.current[i];
         if (current === undefined) return;
         const shared = queueRef.current === originalRef.current;
-        const moved = insertNext(queueRef.current, i, id);
+        const moved = insertNext(queueRef.current, i, ids);
         queueRef.current = moved.queue;
         indexRef.current = moved.index;
         originalRef.current = shared
           ? moved.queue
-          : insertNext(originalRef.current, Math.max(originalRef.current.indexOf(current), 0), id).queue;
+          : insertNext(originalRef.current, Math.max(originalRef.current.indexOf(current), 0), ids).queue;
         // The embed's playlist is in the old order: stop following it, the next track change reloads it.
         embedListRef.current = [];
         sync();

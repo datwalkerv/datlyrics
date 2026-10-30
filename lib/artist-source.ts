@@ -164,3 +164,18 @@ export function rankArtists(credits: string[], max = 4): string[] {
     .slice(0, max)
     .map(([id]) => id);
 }
+
+/** A playlist's (or album's) tracks in order, from its first page (YouTube Music shows ~100). */
+export async function getPlaylistTracks(listId: string): Promise<string[]> {
+  "use cache";
+  cacheLife("hours");
+
+  return parsePlaylistTracks(await call("browse", { browseId: `VL${listId}` }));
+}
+
+export function parsePlaylistTracks(data: unknown): string[] {
+  const ids = findAll(data, "musicResponsiveListItemRenderer").map(
+    (row) => (row.playlistItemData as { videoId?: string } | undefined)?.videoId,
+  );
+  return [...new Set(ids.filter((id): id is string => typeof id === "string"))];
+}

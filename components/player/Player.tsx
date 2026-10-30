@@ -11,6 +11,7 @@ import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
 import { MiniPlayer } from "./MiniPlayer";
+import { PLAY_NEXT_EVENT } from "./remote";
 import { Settings } from "./Settings";
 import { NowPlaying } from "./NowPlaying";
 import { PlainLyrics } from "./PlainLyrics";
@@ -59,9 +60,6 @@ function readVideoPref(): boolean {
     return false;
   }
 }
-
-/** Ask the mounted player to play a song after the current one (see PlayerHost's `playNext`). */
-export const PLAY_NEXT_EVENT = "datlyrics:play-next";
 
 export function Player({
   videoId,
@@ -162,8 +160,9 @@ export function Player({
 
   useEffect(() => {
     const onPlayNext = (e: Event) => {
-      controls.playNext((e as CustomEvent<string>).detail);
-      flash("Playing next");
+      const ids = (e as CustomEvent<string[]>).detail;
+      controls.playNext(ids);
+      flash(ids.length > 1 ? `${ids.length} songs playing next` : "Playing next");
     };
     window.addEventListener(PLAY_NEXT_EVENT, onPlayNext);
     return () => window.removeEventListener(PLAY_NEXT_EVENT, onPlayNext);

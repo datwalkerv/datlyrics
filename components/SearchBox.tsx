@@ -3,6 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { parseYouTubeUrl, targetToQuery } from "@/lib/parse-youtube-url";
+import { removeItem, resolveSaved, saveItem, useSaved } from "@/lib/saved";
+import { playHere, playNext } from "./player/remote";
 import type { SearchResult } from "@/lib/search-source";
 
 type Results = { q: string; results: SearchResult[]; failed: boolean };
@@ -34,6 +36,14 @@ export function SearchBox({
   const [query, setQuery] = useState("");
   const [data, setData] = useState<Results | null>(null);
   const [selected, setSelected] = useState(0);
+
+  const savedSongs = new Set(useSaved().flatMap((x) => (x.kind === "song" ? [x.id] : [])));
+  const toggleSave = (id: string) =>
+    savedSongs.has(id)
+      ? removeItem("song", id)
+      : resolveSaved({ videoId: id })
+          .then(saveItem)
+          .catch(() => {});
 
   const q = query.trim();
   const link = parseYouTubeUrl(q);
@@ -147,14 +157,14 @@ export function SearchBox({
           role="listbox"
         >
           {results.map((r, i) => (
-            <li key={r.id} role="option" aria-selected={i === selected}>
-              <button
-                onMouseEnter={() => setSelected(i)}
-                onClick={() => play(`/play?v=${r.id}`)}
-                className={`flex w-full items-center gap-4 rounded-2xl px-3 py-2.5 text-left transition-colors ${
-                  i === selected ? "bg-white/10" : ""
-                }`}
-              >
+            <li
+              key={r.id}
+              role="option"
+              aria-selected={i === selected}
+              onMouseEnter={() => setSelected(i)}
+              className={`flex items-center rounded-2xl transition-colors ${i === selected ? "bg-white/10" : ""}`}
+            >
+              <button onClick={() => play(`/play?v=${r.id}`)} className="flex min-w-0 flex-1 items-center gap-4 py-2.5 pl-3 text-left">
                 {/* eslint-disable-next-line @next/next/no-img-element */}
                 <img
                   src={`https://i.ytimg.com/vi/${r.id}/mqdefault.jpg`}
@@ -165,8 +175,28 @@ export function SearchBox({
                   <span className="block truncate font-semibold text-white">{r.title}</span>
                   <span className="block truncate text-sm text-white/50">{r.channel}</span>
                 </span>
-                <span className="shrink-0 text-sm tabular-nums text-white/40">{r.duration}</span>
               </button>
+              {/* Hovering the duration slides out quick actions; leaving hides them again. */}
+              <div className="group/actions flex shrink-0 items-center self-stretch py-2.5 pl-3 pr-3">
+                <span className="text-sm tabular-nums text-white/40">{r.duration}</span>
+                <div className="flex max-w-0 items-center gap-1 overflow-hidden opacity-0 transition-all duration-200 ease-out group-hover/actions:ml-2 group-hover/actions:max-w-20 group-hover/actions:opacity-100 focus-within:ml-2 focus-within:max-w-20 focus-within:opacity-100">
+                  <ResultAction
+                    label="Play next"
+                    onClick={() => {
+                      // With nothing playing there's nothing to queue after: start it in place.
+                      if (!playNext([r.id])) playHere({ videoId: r.id });
+                    }}
+                  >
+                    <path d="M4 6h11M4 12h11M4 18h7M17 15l4 3-4 3z" />
+                  </ResultAction>
+                  <ResultAction label={savedSongs.has(r.id) ? "Remove from Saved" : "Save"} onClick={() => toggleSave(r.id)}>
+                    <path
+                      d="M12 20.5s-7.5-4.6-7.5-10.1A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.5 2.8c0 5.5-7.5 10.1-7.5 10.1Z"
+                      fill={savedSongs.has(r.id) ? "currentColor" : "none"}
+                    />
+                  </ResultAction>
+                </div>
+              </div>
             </li>
           ))}
           {!loading && data && results.length === 0 && (
@@ -179,5 +209,20 @@ export function SearchBox({
 
       {!q && hint && <p className="border-t border-white/10 px-6 py-3 text-xs text-white/35">{hint}</p>}
     </>
+  );
+}
+
+function ResultAction({ label, onClick, children }: { label: string; onClick: () => void; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      aria-label={label}
+      title={label}
+      className="flex size-8 shrink-0 items-center justify-center rounded-full text-white/60 transition hover:bg-white/10 hover:text-white"
+    >
+      <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {children}
+      </svg>
+    </button>
   );
 }

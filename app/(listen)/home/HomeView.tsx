@@ -8,9 +8,9 @@ import { useHistory, type HistoryEntry } from "@/lib/history";
 import { PINNED, SAVED_LIST_ID, isPinned, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
 import type { RadioTrack } from "@/lib/video-source";
 import { HomeSearch } from "../HomeSearch";
-import { playHere, usePlayerHref } from "../PlayerHost";
+import { playHere, usePlayerHref } from "@/components/player/remote";
 import { SavedCard, SavedShelf } from "../SavedShelf";
-import { SongMenu, menuAt, type SongMenuState } from "./SongMenu";
+import { CardMenu, menuAt, type CardMenuState } from "./CardMenu";
 
 const CARD = "w-36 snap-start sm:w-40";
 
@@ -41,18 +41,13 @@ export function HomeView() {
   const glow = history[0]?.image ?? null;
 
   const play = (item: Pick<SavedItem, "kind" | "id">) => playHere(savedTarget(item));
-  const [menu, setMenu] = useState<SongMenuState | null>(null);
+  // Every card's right-click menu: play next, save / unsave.
+  const [menu, setMenu] = useState<CardMenuState | null>(null);
   const closeMenu = useCallback(() => setMenu(null), []);
+  const openMenu = (e: React.MouseEvent, item: SavedItem) => setMenu(menuAt(e, item));
 
-  /** A song card with the right-click menu (play next, save). */
-  const songCard = (song: SavedItem) => (
-    <SavedCard
-      item={song}
-      className={CARD}
-      pinned
-      onPlay={() => play(song)}
-      onContextMenu={(e) => setMenu(menuAt(e, song))}
-    />
+  const card = (item: SavedItem) => (
+    <SavedCard item={item} className={CARD} pinned onPlay={() => play(item)} onContextMenu={(e) => openMenu(e, item)} />
   );
 
   return (
@@ -97,7 +92,7 @@ export function HomeView() {
             <Row>
               {recommended
                 ? recommended.map((t) => (
-                    <Animated key={t.id}>{songCard(songItem(t.id, t.title, t.artist, t.image))}</Animated>
+                    <Animated key={t.id}>{card(songItem(t.id, t.title, t.artist, t.image))}</Animated>
                   ))
                 : <Skeletons />}
             </Row>
@@ -108,7 +103,7 @@ export function HomeView() {
           <Section title="Recently played">
             <Row>
               {recent.map((h) => (
-                <Animated key={h.id}>{songCard(songItem(h.id, h.title, h.artist, h.image))}</Animated>
+                <Animated key={h.id}>{card(songItem(h.id, h.title, h.artist, h.image))}</Animated>
               ))}
             </Row>
           </Section>
@@ -118,8 +113,9 @@ export function HomeView() {
           <SavedShelf
             variant="home"
             resume={resume}
+            onCardMenu={openMenu}
             leading={unsaved.map((h) => (
-              <ContinueCard key={h.listId} entry={h} />
+              <ContinueCard key={h.listId} entry={h} onContextMenu={openMenu} />
             ))}
           />
         </Section>
@@ -137,14 +133,7 @@ export function HomeView() {
                       <Row>
                         {releases
                           ? releases[kind].map((r) => (
-                              <Animated key={r.listId}>
-                                <SavedCard
-                                  item={releaseItem(r)}
-                                  className={CARD}
-                                  pinned
-                                  onPlay={() => play({ kind: "playlist", id: r.listId })}
-                                />
-                              </Animated>
+                              <Animated key={r.listId}>{card(releaseItem(r))}</Animated>
                             ))
                           : <Skeletons />}
                       </Row>
@@ -156,7 +145,7 @@ export function HomeView() {
         )}
       </div>
 
-      <AnimatePresence>{menu && <SongMenu key={`${menu.song.id}:${menu.x}:${menu.y}`} menu={menu} onClose={closeMenu} />}</AnimatePresence>
+      <AnimatePresence>{menu && <CardMenu key={`${menu.item.id}:${menu.x}:${menu.y}`} menu={menu} onClose={closeMenu} />}</AnimatePresence>
     </main>
   );
 }
@@ -209,7 +198,13 @@ function Skeletons() {
 }
 
 /** A playlist you were in the middle of but didn't save: its cover and name, resuming at your track. */
-function ContinueCard({ entry }: { entry: HistoryEntry }) {
+function ContinueCard({
+  entry,
+  onContextMenu,
+}: {
+  entry: HistoryEntry;
+  onContextMenu: (e: React.MouseEvent, item: SavedItem) => void;
+}) {
   const listId = entry.listId!;
   const [list, setList] = useState<Pick<SavedItem, "title" | "image" | "badge"> | null>(null);
 
@@ -233,7 +228,15 @@ function ContinueCard({ entry }: { entry: HistoryEntry }) {
     savedAt: 0,
     badge: list?.badge,
   };
-  return <SavedCard item={item} className="w-36 sm:w-40" pinned onPlay={() => playHere({ listId, videoId: entry.id })} />;
+  return (
+    <SavedCard
+      item={item}
+      className="w-36 sm:w-40"
+      pinned
+      onPlay={() => playHere({ listId, videoId: entry.id })}
+      onContextMenu={(e) => onContextMenu(e, item)}
+    />
+  );
 }
 
 const songItem = (id: string, title: string, artist: string, image: string | null): SavedItem => ({

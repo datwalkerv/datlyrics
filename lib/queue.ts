@@ -1,12 +1,13 @@
 /**
- * `queue` with `id` moved (or added) right after position `at`, and where the track at `at` ends
- * up. Playing the current track next does nothing.
+ * `queue` with `ids` moved (or added), in order, right after position `at`, and where the track at
+ * `at` ends up. The current track itself stays where it is.
  */
-export function insertNext(queue: string[], at: number, id: string): { queue: string[]; index: number } {
+export function insertNext(queue: string[], at: number, ids: string[]): { queue: string[]; index: number } {
   const current = queue[at];
-  if (current === undefined || current === id) return { queue, index: at };
-  const index = at - queue.slice(0, at).filter((x) => x === id).length;
-  const next = queue.filter((x) => x !== id);
-  next.splice(index + 1, 0, id);
+  const moving = new Set(ids.filter((id) => id !== current));
+  if (current === undefined || !moving.size) return { queue, index: at };
+  const index = at - queue.slice(0, at).filter((x) => moving.has(x)).length;
+  const next = queue.filter((x) => !moving.has(x));
+  next.splice(index + 1, 0, ...moving);
   return { queue: next, index };
 }

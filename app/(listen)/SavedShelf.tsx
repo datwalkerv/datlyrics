@@ -6,7 +6,7 @@ import { useEffect, useState, type ReactNode } from "react";
 import type { HistoryEntry } from "@/lib/history";
 import { CoverImage } from "@/components/player/CoverImage";
 import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
-import { playHere } from "./PlayerHost";
+import { playHere } from "@/components/player/remote";
 import {
   PINNED,
   SAVED_LIMIT,
@@ -27,12 +27,15 @@ export function SavedShelf({
   variant = "landing",
   leading,
   resume,
+  onCardMenu,
 }: {
   variant?: "landing" | "home";
   /** Cards shown before the saved ones (/home: playlists you were in that aren't saved). */
   leading?: ReactNode;
   /** Where you left off in each playlist, by list id: its card resumes there. */
   resume?: Map<string, HistoryEntry>;
+  /** Right-click on a card (/home's play next / save menu). */
+  onCardMenu?: (e: React.MouseEvent, item: SavedItem) => void;
 }) {
   const home = variant === "home";
   const width = home ? "w-36 sm:w-40" : "w-28";
@@ -56,6 +59,7 @@ export function SavedShelf({
     const at = item.kind === "playlist" ? resume?.get(item.id) : undefined;
     playHere(at ? { listId: item.id, videoId: at.id } : savedTarget(item));
   };
+  const menu = (item: SavedItem) => onCardMenu && ((e: React.MouseEvent) => onCardMenu(e, item));
   const withResume = (item: SavedItem): SavedItem => {
     const at = item.kind === "playlist" ? resume?.get(item.id) : undefined;
     return at ? { ...item, subtitle: `Resume · ${at.title}` } : item;
@@ -73,9 +77,9 @@ export function SavedShelf({
       <div className={`flex flex-wrap gap-4 ${home ? "sm:gap-5" : "justify-center"}`}>
         {leading}
         {pinned.map((item) => (
-          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={withResume(item)} className={width} pinned onPlay={() => play(item)} />
+          <SavedCard key={`pinned:${item.kind}:${item.id}`} item={withResume(item)} className={width} pinned onPlay={() => play(item)} onContextMenu={menu(item)} />
         ))}
-        {songCount > 0 && <SavedCard item={withResume(savedSongs)} className={width} pinned onPlay={() => play(savedSongs)} />}
+        {songCount > 0 && <SavedCard item={withResume(savedSongs)} className={width} pinned onPlay={() => play(savedSongs)} onContextMenu={menu(savedSongs)} />}
         <AnimatePresence initial={false}>
           {items.map((item) => (
             <motion.div
@@ -86,7 +90,7 @@ export function SavedShelf({
               exit={{ opacity: 0, scale: 0.9 }}
               transition={{ duration: 0.25 }}
             >
-              <SavedCard item={withResume(item)} className={width} onPlay={() => play(item)} />
+              <SavedCard item={withResume(item)} className={width} onPlay={() => play(item)} onContextMenu={menu(item)} />
             </motion.div>
           ))}
         </AnimatePresence>

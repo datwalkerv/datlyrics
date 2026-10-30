@@ -2,41 +2,9 @@
 
 import Link from "next/link";
 import { usePathname, useSearchParams } from "next/navigation";
-import { useEffect, useState, useSyncExternalStore } from "react";
-import { PLAY_NEXT_EVENT, Player } from "@/components/player/Player";
-
-export type Target = { videoId?: string; listId?: string };
-
-// Pages other than /play (like /home) can start something without leaving: it plays minimized.
-let requested: Target | null = null;
-const listeners = new Set<() => void>();
-const subscribe = (fn: () => void) => {
-  listeners.add(fn);
-  return () => {
-    listeners.delete(fn);
-  };
-};
-
-// What the player has loaded, for links back to it (like /home's logo).
-let current: Target | null = null;
-
-/** The /play link for what's loaded in the player, or null when nothing is. */
-export function usePlayerHref(): string | null {
-  const t = useSyncExternalStore(subscribe, () => current, () => null);
-  return t ? `/play?${new URLSearchParams({ ...(t.videoId && { v: t.videoId }), ...(t.listId && { list: t.listId }) })}` : null;
-}
-
-/** Queue a song right after what's playing; with nothing playing, just play it here. */
-export function playNext(videoId: string) {
-  if (!current) return playHere({ videoId });
-  window.dispatchEvent(new CustomEvent(PLAY_NEXT_EVENT, { detail: videoId }));
-}
-
-/** Play this right where you are, in the mini bar; its link opens the lyrics. */
-export function playHere(target: Target) {
-  requested = { ...target };
-  for (const fn of listeners) fn();
-}
+import { useEffect, useState } from "react";
+import { Player } from "@/components/player/Player";
+import { publishCurrent, useRequested, type Target } from "@/components/player/remote";
 
 /**
  * The player lives in the layout, not the /play page, so going home or browsing an artist page doesn't stop it:
@@ -57,7 +25,7 @@ export function PlayerHost() {
 
   // Off /play, keep playing whatever /play (or playHere) last asked for.
   const [last, setLast] = useState<Target | null>(null);
-  const request = useSyncExternalStore(subscribe, () => requested, () => null);
+  const request = useRequested();
   const [seenRequest, setSeenRequest] = useState(request);
   if (request !== seenRequest) {
     setSeenRequest(request);
@@ -68,10 +36,7 @@ export function PlayerHost() {
 
   const videoId = target?.videoId;
   const listId = target?.listId;
-  useEffect(() => {
-    current = videoId || listId ? { videoId, listId } : null;
-    for (const fn of listeners) fn();
-  }, [videoId, listId]);
+  useEffect(() => publishCurrent(videoId || listId ? { videoId, listId } : null), [videoId, listId]);
 
   if (onPlay && !hasUrlTarget) {
     return (

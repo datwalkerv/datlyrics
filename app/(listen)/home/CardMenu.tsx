@@ -2,28 +2,58 @@
 
 import { motion } from "motion/react";
 import { useEffect, useRef } from "react";
-import { removeItem, saveItem, useSaved, type SavedItem } from "@/lib/saved";
-import { playNext } from "../PlayerHost";
+import { isPlayerLoaded, playHere, playNext } from "@/components/player/remote";
+import {
+  SAVED_LIST_ID,
+  isPinned,
+  removeItem,
+  resolveSaved,
+  saveItem,
+  savedSongIds,
+  savedTarget,
+  useSaved,
+  type SavedItem,
+} from "@/lib/saved";
 
-export type SongMenuState = { x: number; y: number; song: SavedItem };
+export type CardMenuState = { x: number; y: number; item: SavedItem };
 
-const WIDTH = 208;
+const WIDTH = 224;
 const HEIGHT = 96;
 
-/** Right-click on a song card: open from where it was clicked (or the card, from the keyboard). */
-export function menuAt(e: React.MouseEvent, song: SavedItem): SongMenuState {
+/** Right-click on a card: open from where it was clicked (or the card, from the keyboard). */
+export function menuAt(e: React.MouseEvent, item: SavedItem): CardMenuState {
   e.preventDefault();
   // The context-menu key / Shift+F10 fire at 0,0: open by the focused card instead.
   const fromKeyboard = e.clientX === 0 && e.clientY === 0;
   const box = (e.currentTarget as HTMLElement).getBoundingClientRect();
-  return { x: fromKeyboard ? box.left + 12 : e.clientX, y: fromKeyboard ? box.top + 12 : e.clientY, song };
+  return { x: fromKeyboard ? box.left + 12 : e.clientX, y: fromKeyboard ? box.top + 12 : e.clientY, item };
 }
 
-/** Play next and save/unsave for a song, at the pointer, kept inside the window. */
-export function SongMenu({ menu, onClose }: { menu: SongMenuState; onClose: () => void }) {
+/** Queue a song, or every track of a list, after what's playing; with nothing playing, start it. */
+async function queueNext(item: SavedItem) {
+  if (item.kind === "song") {
+    if (!playNext([item.id])) playHere({ videoId: item.id });
+    return;
+  }
+  if (!isPlayerLoaded()) return playHere(savedTarget(item));
+  const ids =
+    item.id === SAVED_LIST_ID
+      ? savedSongIds()
+      : await fetch(`/api/playlist/${item.id}/tracks`)
+          .then((res) => (res.ok ? (res.json() as Promise<{ ids: string[] }>) : { ids: [] }))
+          .then((d) => d.ids)
+          .catch(() => []);
+  playNext(ids);
+}
+
+/** Play next and save/unsave for a card's song or list, at the pointer, kept inside the window. */
+export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
-  const { song } = menu;
-  const saved = useSaved().some((x) => x.kind === "song" && x.id === song.id);
+  const { item } = menu;
+  const saved = useSaved().some((x) => x.kind === item.kind && x.id === item.id);
+  // The pinned demo and the Saved songs list are always on the shelf: nothing to save or remove.
+  const canSave = !isPinned(item.kind, item.id) && item.id !== SAVED_LIST_ID;
+  const isSong = item.kind === "song";
 
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
@@ -55,11 +85,20 @@ export function SongMenu({ menu, onClose }: { menu: SongMenuState; onClose: () =
     onClose();
   };
 
+  const toggleSave = () => {
+    if (saved) return removeItem(item.kind, item.id);
+    if (isSong) return saveItem({ kind: "song", id: item.id, title: item.title, subtitle: item.subtitle, image: item.image });
+    // Cards can show "Resume · …" or "Artist · year" as subtitles: save the list's own details.
+    resolveSaved({ listId: item.id })
+      .then(saveItem)
+      .catch(() => {});
+  };
+
   return (
     <motion.div
       ref={ref}
       role="menu"
-      aria-label={song.title}
+      aria-label={item.title}
       style={{
         left: Math.min(menu.x, window.innerWidth - WIDTH - 8),
         top: Math.min(menu.y, window.innerHeight - HEIGHT - 8),
@@ -72,27 +111,25 @@ export function SongMenu({ menu, onClose }: { menu: SongMenuState; onClose: () =
       transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <Item onClick={act(() => playNext(song.id))} icon={<path d="M4 6h11M4 12h11M4 18h7M17 15l4 3-4 3z" />}>
+      <Item onClick={act(() => void queueNext(item))} icon={<QueueIcon />}>
         Play next
       </Item>
-      <Item
-        onClick={act(() =>
-          saved
-            ? removeItem("song", song.id)
-            : saveItem({ kind: "song", id: song.id, title: song.title, subtitle: song.subtitle, image: song.image }),
-        )}
-        icon={
-          <path
-            d="M12 20.5s-7.5-4.6-7.5-10.1A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.5 2.8c0 5.5-7.5 10.1-7.5 10.1Z"
-            fill={saved ? "currentColor" : "none"}
-          />
-        }
-      >
-        {saved ? "Remove from Saved" : "Save"}
-      </Item>
+      {canSave && (
+        <Item onClick={act(toggleSave)} icon={<HeartIcon filled={saved} />}>
+          {saved ? (isSong ? "Remove from Saved" : "Remove from your playlists") : isSong ? "Save" : "Save to your playlists"}
+        </Item>
+      )}
     </motion.div>
   );
 }
+
+export const QueueIcon = () => <path d="M4 6h11M4 12h11M4 18h7M17 15l4 3-4 3z" />;
+export const HeartIcon = ({ filled }: { filled: boolean }) => (
+  <path
+    d="M12 20.5s-7.5-4.6-7.5-10.1A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.5 2.8c0 5.5-7.5 10.1-7.5 10.1Z"
+    fill={filled ? "currentColor" : "none"}
+  />
+);
 
 function Item({ onClick, icon, children }: { onClick: () => void; icon: React.ReactNode; children: React.ReactNode }) {
   return (

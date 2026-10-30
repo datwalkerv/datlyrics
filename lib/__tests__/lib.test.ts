@@ -222,13 +222,16 @@ describe("parseBackup", () => {
 
 describe("insertNext", () => {
   it("adds a new track right after the current one", () => {
-    expect(insertNext(["a", "b", "c"], 0, "x")).toEqual({ queue: ["a", "x", "b", "c"], index: 0 });
+    expect(insertNext(["a", "b", "c"], 0, ["x"])).toEqual({ queue: ["a", "x", "b", "c"], index: 0 });
   });
   it("moves an already queued track, keeping the current one current", () => {
-    expect(insertNext(["a", "b", "c", "d"], 2, "a")).toEqual({ queue: ["b", "c", "a", "d"], index: 1 });
-    expect(insertNext(["a", "b", "c", "d"], 1, "d")).toEqual({ queue: ["a", "b", "d", "c"], index: 1 });
+    expect(insertNext(["a", "b", "c", "d"], 2, ["a"])).toEqual({ queue: ["b", "c", "a", "d"], index: 1 });
+    expect(insertNext(["a", "b", "c", "d"], 1, ["d"])).toEqual({ queue: ["a", "b", "d", "c"], index: 1 });
+  });
+  it("queues a whole list in order, skipping the current track", () => {
+    expect(insertNext(["a", "b", "c"], 1, ["x", "b", "a", "y"])).toEqual({ queue: ["b", "x", "a", "y", "c"], index: 0 });
   });
   it("leaves the queue alone for the current track", () => {
-    expect(insertNext(["a", "b"], 1, "b")).toEqual({ queue: ["a", "b"], index: 1 });
+    expect(insertNext(["a", "b"], 1, ["b"])).toEqual({ queue: ["a", "b"], index: 1 });
   });
 });
