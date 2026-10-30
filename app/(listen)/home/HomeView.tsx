@@ -5,7 +5,7 @@ import Link from "next/link";
 import { useEffect, useState, type ReactNode } from "react";
 import type { ArtistRelease } from "@/lib/artist-source";
 import { useHistory, type HistoryEntry } from "@/lib/history";
-import { SAVED_LIST_ID, isPinned, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
+import { PINNED, SAVED_LIST_ID, isPinned, resolveSaved, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
 import type { RadioTrack } from "@/lib/video-source";
 import { HomeSearch } from "../HomeSearch";
 import { playHere, usePlayerHref } from "../PlayerHost";
@@ -197,7 +197,7 @@ function Skeletons() {
 /** A playlist you were in the middle of but didn't save: its cover and name, resuming at your track. */
 function ContinueCard({ entry }: { entry: HistoryEntry }) {
   const listId = entry.listId!;
-  const [list, setList] = useState<Pick<SavedItem, "title" | "image"> | null>(null);
+  const [list, setList] = useState<Pick<SavedItem, "title" | "image" | "badge"> | null>(null);
 
   useEffect(() => {
     let alive = true;
@@ -217,6 +217,7 @@ function ContinueCard({ entry }: { entry: HistoryEntry }) {
     subtitle: `Resume · ${entry.title}`,
     image: list?.image ?? entry.image,
     savedAt: 0,
+    badge: list?.badge,
   };
   return <SavedCard item={item} className="w-36 sm:w-40" pinned onPlay={() => playHere({ listId, videoId: entry.id })} />;
 }
@@ -242,19 +243,21 @@ const releaseItem = (r: Release): SavedItem => ({
   subtitle: [r.artist, r.year].filter(Boolean).join(" · "),
   image: r.image,
   savedAt: 0,
+  badge: r.kind,
 });
 
 /**
- * The library the releases come from: each saved song's main artist ("A, B feat. C" is A) and each
- * saved playlist. Empty when nothing is saved.
+ * The library the releases come from: the pinned playlists everyone has, each saved song's main
+ * artist ("A, B feat. C" is A) and each saved playlist.
  */
 function libraryQuery(saved: SavedItem[]): string {
   const params = new URLSearchParams();
+  for (const p of PINNED) if (p.kind === "playlist") params.append("list", p.id);
   for (const s of saved) {
     if (s.kind === "song") {
       const artist = s.subtitle.split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0].trim();
       if (artist) params.append("artist", artist);
-    } else if (s.id !== SAVED_LIST_ID) params.append("list", s.id);
+    } else if (s.id !== SAVED_LIST_ID && !isPinned(s.kind, s.id)) params.append("list", s.id);
   }
   return params.toString();
 }

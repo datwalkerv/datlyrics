@@ -64,7 +64,7 @@ export function SavedShelf({
   // Playlists saved before covers were fetched show their first video instead; upgrade them once.
   useEffect(() => {
     for (const item of items) {
-      if (!item.image?.includes("/pl_c/")) refreshPlaylistCover(item.id);
+      if (!item.image?.includes("/pl_c/") || !item.badge) refreshPlaylistCover(item.id);
     }
   }, [items]);
 
@@ -146,7 +146,7 @@ export function SavedCard({
           </div>
           {item.kind === "playlist" && (
             <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80 backdrop-blur">
-              Playlist
+              {item.badge ?? "Playlist"}
             </span>
           )}
         </div>

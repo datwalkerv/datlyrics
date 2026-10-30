@@ -134,8 +134,8 @@ describe("parseArtist", () => {
       image: "banner",
       songs: [{ id: "KIXP--0-Tac", title: "No Pole", album: "Love Sick (Deluxe)", image: null }],
       allSongsListId: "OLAK5uy_songs",
-      albums: [{ listId: "OLAK5uy_octane", title: "OCTANE", year: "2026", image: "img:OCTANE" }],
-      singles: [{ listId: "OLAK5uy_chop", title: "CHOPTANE", year: "2026", image: "img:CHOPTANE" }],
+      albums: [{ listId: "OLAK5uy_octane", title: "OCTANE", year: "2026", image: "img:OCTANE", kind: "Album" }],
+      singles: [{ listId: "OLAK5uy_chop", title: "CHOPTANE", year: "2026", image: "img:CHOPTANE", kind: "EP" }],
     });
   });
 
@@ -175,7 +175,7 @@ describe("mergeResults", () => {
 });
 
 describe("mergeReleases", () => {
-  const rel = (listId: string, year: string) => ({ listId, title: listId, year, image: null });
+  const rel = (listId: string, year: string) => ({ listId, title: listId, year, image: null, kind: "Single" as const });
   it("lists newest first, taking turns between artists within a year, without repeats", () => {
     const a = [rel("a26", "2026"), rel("a26b", "2026"), rel("a24", "2024")];
     const b = [rel("b26", "2026"), rel("b25", "2025"), rel("a26", "2026")];

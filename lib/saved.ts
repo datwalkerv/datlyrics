@@ -13,6 +13,8 @@ export type SavedItem = {
   subtitle: string;
   image: string | null;
   savedAt: number;
+  /** The card's badge for lists: "Playlist", "Album", "Single" or "EP" (older saves don't have it). */
+  badge?: string;
 };
 
 /** Shown first on everyone's shelf; can't be removed and don't count toward the limit. */
@@ -125,8 +127,15 @@ export async function resolveSaved(target: { videoId?: string; listId?: string }
   if (target.listId) {
     const res = await fetch(`/api/playlist/${target.listId}`);
     if (!res.ok) throw new Error("playlist unavailable");
-    const p = (await res.json()) as { title: string; channel: string; thumbnail: string | null };
-    return { kind: "playlist", id: target.listId, title: p.title, subtitle: p.channel, image: p.thumbnail };
+    const p = (await res.json()) as { title: string; channel: string; thumbnail: string | null; kind: string | null };
+    return {
+      kind: "playlist",
+      id: target.listId,
+      title: p.title,
+      subtitle: p.channel,
+      image: p.thumbnail,
+      ...(p.kind && { badge: p.kind }),
+    };
   }
   const id = target.videoId!;
   const v = await fetchVideoInfo(id);

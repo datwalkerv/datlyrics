@@ -1,7 +1,13 @@
 import { cacheLife } from "next/cache";
 
 export type ArtistSong = { id: string; title: string; album: string; image: string | null };
-export type ArtistRelease = { listId: string; title: string; year: string; image: string | null };
+export type ArtistRelease = {
+  listId: string;
+  title: string;
+  year: string;
+  image: string | null;
+  kind: "Album" | "Single" | "EP";
+};
 export type Artist = {
   name: string;
   image: string | null;
@@ -71,13 +77,16 @@ export function biggestThumb(node: unknown): string | null {
   return thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a)).url;
 }
 
-function release(item: Obj): ArtistRelease | null {
+/** `shelfKind` is the shelf's default: the Albums shelf only says the year, "Singles & EPs" says which. */
+function release(item: Obj, shelfKind: ArtistRelease["kind"]): ArtistRelease | null {
   const json = JSON.stringify(item);
   const listId = json.match(/"playlistId":"(OLAK5uy_[\w-]+)"/)?.[1];
   const title = text(item.title);
   if (!listId || !title) return null;
-  const year = text(item.subtitle).match(/\b\d{4}\b/)?.[0] ?? "";
-  return { listId, title, year, image: biggestThumb(item.thumbnailRenderer) };
+  const subtitle = text(item.subtitle);
+  const year = subtitle.match(/\b\d{4}\b/)?.[0] ?? "";
+  const kind = (subtitle.match(/\b(Album|Single|EP)\b/)?.[1] as ArtistRelease["kind"] | undefined) ?? shelfKind;
+  return { listId, title, year, image: biggestThumb(item.thumbnailRenderer), kind };
 }
 
 /** Pull the header, top songs and album/single shelves out of an artist `browse` response. */
@@ -95,10 +104,10 @@ export function parseArtist(data: unknown): Artist | null {
   }
   const allSongsListId = JSON.stringify(shelf?.title ?? null).match(/"browseId":"VL(OLAK5uy_[\w-]+)"/)?.[1] ?? null;
 
-  const carousel = (title: string) => {
+  const carousel = (title: string, shelfKind: ArtistRelease["kind"]) => {
     const c = findAll(data, "musicCarouselShelfRenderer").find((s) => JSON.stringify(s.header).includes(`"text":"${title}"`));
     return findAll(c?.contents, "musicTwoRowItemRenderer")
-      .map(release)
+      .map((item) => release(item, shelfKind))
       .filter((x) => x !== null);
   };
 
@@ -107,8 +116,8 @@ export function parseArtist(data: unknown): Artist | null {
     image: biggestThumb(header?.thumbnail),
     songs,
     allSongsListId,
-    albums: carousel("Albums"),
-    singles: carousel("Singles & EPs"),
+    albums: carousel("Albums", "Album"),
+    singles: carousel("Singles & EPs", "Single"),
   };
 }
 

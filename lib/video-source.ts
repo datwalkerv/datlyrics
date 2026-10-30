@@ -15,7 +15,7 @@ export async function getVideoInfo(id: string): Promise<VideoInfo | null> {
   return { title: data.title, channel: data.author_name };
 }
 
-export type PlaylistInfo = { title: string; channel: string; thumbnail: string | null };
+export type PlaylistInfo = { title: string; channel: string; thumbnail: string | null; kind: ListKind | null };
 
 type Thumb = { url: string; width?: number };
 
@@ -36,24 +36,44 @@ function findKey(node: unknown, key: string): unknown {
   return undefined;
 }
 
-/**
- * The playlist's own square cover, from YouTube Music's playlist header (the same image
- * music.youtube.com shows). oEmbed only offers the first video's thumbnail.
- */
-async function playlistCover(id: string): Promise<string | null> {
-  const res = await fetch("https://music.youtube.com/youtubei/v1/browse?prettyPrint=false", {
+/** What kind of list it is, as YouTube Music labels it. */
+export type ListKind = "Playlist" | "Album" | "Single" | "EP";
+const KINDS: ListKind[] = ["Playlist", "Album", "Single", "EP"];
+
+function browseMusic(browseId: string): Promise<unknown | null> {
+  return fetch("https://music.youtube.com/youtubei/v1/browse?prettyPrint=false", {
     method: "POST",
     headers: { "Content-Type": "application/json", Origin: "https://music.youtube.com" },
     body: JSON.stringify({
       context: { client: { clientName: "WEB_REMIX", clientVersion: "1.20250101.01.00", hl: "en" } },
-      browseId: `VL${id}`,
+      browseId,
     }),
-  });
-  if (!res.ok) return null;
-  const header = findKey(await res.json(), "musicResponsiveHeaderRenderer");
+  }).then((res) => (res.ok ? res.json() : null));
+}
+
+/**
+ * The list's own square cover and kind, from YouTube Music's header (the same image and label
+ * music.youtube.com shows). oEmbed only offers the first video's thumbnail. Album, single and EP
+ * lists have no header of their own, only a link to their album page, which has it.
+ */
+type Header = { cover: string | null; kind: ListKind | null; title: string | null; artist: string | null };
+
+async function playlistHeader(id: string): Promise<Header> {
+  const data = await browseMusic(`VL${id}`);
+  let header = findKey(data, "musicResponsiveHeaderRenderer");
+  const albumPage = header ? null : JSON.stringify(data ?? null).match(/"(MPREb_[\w-]+)"/)?.[1];
+  if (albumPage) header = findKey(await browseMusic(albumPage), "musicResponsiveHeaderRenderer");
+  if (!header) return { cover: null, kind: null, title: null, artist: null };
+
+  const runs = (node: unknown) => findKey(node, "runs") as { text: string }[] | undefined;
+  const join = (node: unknown) => runs(node)?.map((r) => r.text).join("") || null;
+  const h = header as Record<string, unknown>;
+  const label = runs(h.subtitle)?.[0]?.text;
+  const kind = KINDS.find((k) => k === label) ?? null;
   const thumbs = findKey(header, "thumbnails") as Thumb[] | undefined;
-  if (!Array.isArray(thumbs) || !thumbs.length) return null;
-  return thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a)).url;
+  const cover = Array.isArray(thumbs) && thumbs.length ? thumbs.reduce((a, b) => ((b.width ?? 0) > (a.width ?? 0) ? b : a)).url : null;
+  // Albums name their artist in the strapline; playlists don't have one.
+  return { cover, kind, title: join(h.title), artist: join(h.straplineTextOne) };
 }
 
 export async function getPlaylistInfo(id: string): Promise<PlaylistInfo | null> {
@@ -61,16 +81,23 @@ export async function getPlaylistInfo(id: string): Promise<PlaylistInfo | null> 
   cacheLife("days");
 
   const url = `https://www.youtube.com/playlist?list=${id}`;
-  const [res, cover] = await Promise.all([
+  const [res, header] = await Promise.all([
     fetch(`https://www.youtube.com/oembed?${new URLSearchParams({ url, format: "json" })}`),
-    playlistCover(id).catch(() => null),
+    playlistHeader(id).catch((): Header => ({ cover: null, kind: null, title: null, artist: null })),
   ]);
   if (res.status === 404 || res.status === 401 || res.status === 400) return null; // private/removed
   if (!res.ok) throw new Error(`oEmbed ${res.status}`);
   const data = (await res.json()) as { title: string; author_name: string; thumbnail_url?: string };
   // hqdefault is letterboxed (black bars); mqdefault is a clean 16:9 frame.
   const fallback = data.thumbnail_url?.replace("/hqdefault.jpg", "/mqdefault.jpg") ?? null;
-  return { title: data.title, channel: data.author_name, thumbnail: cover ?? fallback };
+  // oEmbed titles album lists "Album - <name>" with no channel; the album page has both.
+  const album = header.kind && header.kind !== "Playlist";
+  return {
+    title: (album && header.title) || data.title,
+    channel: (album && header.artist) || data.author_name,
+    thumbnail: header.cover ?? fallback,
+    kind: header.kind,
+  };
 }
 
 export type RadioTrack = { id: string; title: string; artist: string; image: string | null };
