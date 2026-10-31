@@ -4,7 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { CoverImage } from "@/components/player/CoverImage";
-import { EMPTY_COVER, openCreatePlaylist } from "@/components/PlaylistModals";
+import { EMPTY_COVER, blockEmpty, openCreatePlaylist } from "@/components/PlaylistModals";
 import { playHere } from "@/components/player/remote";
 import {
   SAVED_LIST_ID,
@@ -45,6 +45,7 @@ export function SavedShelf({
   const router = useRouter();
   // On /home it plays in the mini bar; the landing page opens the lyrics.
   const play = (item: SavedItem) => {
+    if (item.kind === "playlist" && blockEmpty(item.id)) return;
     if (!home) return router.push(savedHref(item));
     playHere(savedTarget(item));
   };

@@ -3,7 +3,7 @@
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { isPlayerLoaded, playHere, playNext } from "@/components/player/remote";
-import { openEditPlaylist, openSavePicker } from "@/components/PlaylistModals";
+import { blockEmpty, openEditPlaylist, openSavePicker } from "@/components/PlaylistModals";
 import {
   SAVED_LIST_ID,
   isOwnList,
@@ -47,6 +47,7 @@ async function queueNext(item: SavedItem) {
     if (!playNext([item.id])) playHere({ videoId: item.id });
     return;
   }
+  if (blockEmpty(item.id)) return;
   if (!isPlayerLoaded()) return playHere(savedTarget(item));
   if (item.id === SAVED_LIST_ID) return playNext(savedSongIds());
   if (isOwnList(item.id)) return playNext(ownListIds(item.id));

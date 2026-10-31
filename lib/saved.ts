@@ -120,6 +120,10 @@ export const listItem = (id: string) => read().find((x) => x.kind === "playlist"
 /** An own list's songs, latest added first. */
 export const ownListIds = (id: string) => mergeAdded([], listItem(id)?.added);
 
+/** A local list with nothing to play (a new own playlist, or Saved with no songs). */
+export const isEmptyList = (id: string) =>
+  isLocalList(id) && (id === SAVED_LIST_ID ? savedSongIds() : ownListIds(id)).length === 0;
+
 /**
  * Put a song on top of a list. `top` is the list's current first track (its neighbour). A pinned
  * list isn't stored until a song is added to it; then it's kept (off the shelf) for its added songs.

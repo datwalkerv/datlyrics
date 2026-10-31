@@ -1,7 +1,7 @@
 "use client";
 
 import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react";
-import { useEffect, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchVideoInfo } from "@/components/player/useTrackMeta";
 import { cleanTitle } from "@/lib/clean-title";
 import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
@@ -9,6 +9,7 @@ import {
   SAVED_LIMIT,
   addToList,
   createOwnList,
+  isEmptyList,
   isOwnList,
   isPinned,
   mergeAdded,
@@ -26,6 +27,19 @@ import {
 const CREATE_EVENT = "datlyrics:create-playlist";
 const PICK_EVENT = "datlyrics:save-picker";
 const EDIT_EVENT = "datlyrics:edit-playlist";
+const TOAST_EVENT = "datlyrics:toast";
+
+/** A short message above the mini bar, from anywhere. */
+export function showToast(text: string) {
+  window.dispatchEvent(new CustomEvent(TOAST_EVENT, { detail: text }));
+}
+
+/** An empty playlist doesn't start the player: it says so instead. Returns true when it did. */
+export function blockEmpty(listId: string) {
+  if (!isEmptyList(listId)) return false;
+  showToast("This playlist is empty. Add a song first.");
+  return true;
+}
 
 /** An own playlist without a cover: the Saved card's dark gradient, without the heart. */
 export const EMPTY_COVER = "bg-gradient-to-b from-[#191919] to-[#080808]";
@@ -58,6 +72,10 @@ export function PlaylistModals() {
     setToast({ id, text });
     setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2500);
   };
+  const flashRef = useRef(flash);
+  useEffect(() => {
+    flashRef.current = flash;
+  });
 
   useEffect(() => {
     const onCreate = (e: Event) => {
@@ -66,6 +84,8 @@ export function PlaylistModals() {
     };
     const onPick = (e: Event) => setPick((e as CustomEvent<PickerSong>).detail);
     const onEdit = (e: Event) => setEdit((e as CustomEvent<string>).detail);
+    const onToast = (e: Event) => flashRef.current((e as CustomEvent<string>).detail);
+    window.addEventListener(TOAST_EVENT, onToast);
     window.addEventListener(CREATE_EVENT, onCreate);
     window.addEventListener(PICK_EVENT, onPick);
     window.addEventListener(EDIT_EVENT, onEdit);
@@ -73,6 +93,7 @@ export function PlaylistModals() {
       window.removeEventListener(CREATE_EVENT, onCreate);
       window.removeEventListener(PICK_EVENT, onPick);
       window.removeEventListener(EDIT_EVENT, onEdit);
+      window.removeEventListener(TOAST_EVENT, onToast);
     };
   }, []);
 
