@@ -403,8 +403,10 @@ export function useYouTubePlayer(
           cc_load_policy: 0,
           origin: window.location.origin,
         };
+        // A saved list with songs added to it reads its tracks from our API instead (see onReady).
+        const added = listId && !isLocalList(listId) ? listItem(listId)?.added : undefined;
         // Cue (not play) the playlist just to read its track list.
-        if (listId && !isLocalList(listId)) {
+        if (listId && !isLocalList(listId) && !added?.length) {
           playerVars.listType = "playlist";
           playerVars.list = listId;
         }
@@ -507,16 +509,29 @@ export function useYouTubePlayer(
                   return sync({ status: "error", error: listId === SAVED_LIST_ID ? "No saved songs yet." : "No songs in this playlist yet." });
                 return begin(ids, Math.max(0, videoId ? ids.indexOf(videoId) : 0));
               }
+              const start = (ids: string[]) => {
+                const at = videoId ? ids.indexOf(videoId) : 0;
+                if (videoId && at < 0) begin([videoId, ...ids], 0);
+                else begin(ids, Math.max(at, 0));
+              };
+              if (added?.length) {
+                // Songs the user added play woven in, the latest on top. The embed isn't cued with the
+                // YouTube list here: still loading it, it would ignore our queue and play the list's own first track.
+                // shortcut: our API returns the list's first page of tracks (~100); a longer list plays only that far.
+                void fetch(`/api/playlist/${listId}/tracks`)
+                  .then((res) => (res.ok ? (res.json() as Promise<{ ids: string[] }>) : { ids: [] }))
+                  .catch(() => ({ ids: [] as string[] }))
+                  .then(({ ids }) => {
+                    if (!cancelled) start(mergeAdded(ids, added));
+                  });
+                return;
+              }
               let tries = 0;
               listTimer = setInterval(() => {
-                const live = e.target.getPlaylist?.();
-                if (live?.length) {
+                const ids = e.target.getPlaylist?.();
+                if (ids?.length) {
                   clearInterval(listTimer);
-                  // Songs the user added to this saved list play woven in, the latest on top.
-                  const ids = mergeAdded(live, listItem(listId)?.added);
-                  const at = videoId ? ids.indexOf(videoId) : 0;
-                  if (videoId && at < 0) begin([videoId, ...ids], 0);
-                  else begin(ids, Math.max(at, 0));
+                  start(ids);
                 } else if (++tries > 40) {
                   clearInterval(listTimer);
                   if (videoId) begin([videoId], 0);
