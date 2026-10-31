@@ -1,5 +1,6 @@
 import type { Metadata, Viewport } from "next";
 import { Geist } from "next/font/google";
+import { PlaylistModals } from "@/components/PlaylistModals";
 import { SearchPalette } from "@/components/SearchPalette";
 import "./globals.css";
 
@@ -24,6 +25,7 @@ export default function RootLayout({ children }: LayoutProps<"/">) {
       <body className="min-h-full">
         {children}
         <SearchPalette />
+        <PlaylistModals />
       </body>
     </html>
   );

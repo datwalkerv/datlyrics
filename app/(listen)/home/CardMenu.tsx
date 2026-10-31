@@ -3,9 +3,14 @@
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { isPlayerLoaded, playHere, playNext } from "@/components/player/remote";
+import { openEditPlaylist, openSavePicker } from "@/components/PlaylistModals";
 import {
   SAVED_LIST_ID,
+  isOwnList,
   isPinned,
+  listItem,
+  mergeAdded,
+  ownListIds,
   removeItem,
   resolveSaved,
   saveItem,
@@ -18,7 +23,7 @@ import {
 export type CardMenuState = { x: number; y: number; item: SavedItem };
 
 const WIDTH = 224;
-const HEIGHT = 96;
+const HEIGHT = 140;
 
 /** Right-click on a card: open from where it was clicked (or the card, from the keyboard). */
 export function menuAt(e: React.MouseEvent, item: SavedItem): CardMenuState {
@@ -43,14 +48,16 @@ async function queueNext(item: SavedItem) {
     return;
   }
   if (!isPlayerLoaded()) return playHere(savedTarget(item));
-  playNext(item.id === SAVED_LIST_ID ? savedSongIds() : await listTracks(item.id));
+  if (item.id === SAVED_LIST_ID) return playNext(savedSongIds());
+  if (isOwnList(item.id)) return playNext(ownListIds(item.id));
+  playNext(mergeAdded(await listTracks(item.id), listItem(item.id)?.added));
 }
 
 /** Play next and save/unsave for a card's song or list, at the pointer, kept inside the window. */
 export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const { item } = menu;
-  // A single is saved as its song, into the Saved list, not as a one-track playlist card.
+  // A single is saved as its song (to a playlist you pick), not as a one-track playlist card.
   const isSingle = item.kind === "playlist" && item.badge === "Single";
   const [singleSong, setSingleSong] = useState<string | null>(null);
   useEffect(() => {
@@ -62,12 +69,11 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
       alive = false;
     };
   }, [isSingle, item.id]);
-  const target = isSingle ? { kind: "song" as const, id: singleSong } : item;
-  const saved = useSaved().some((x) => x.kind === target.kind && x.id === target.id);
+  const saved = useSaved().some((x) => x.kind === item.kind && x.id === item.id);
   // The pinned demo and the Saved songs list are always on the shelf: nothing to save or remove.
   // A single's menu offers saving once its song is known.
   const canSave = !isPinned(item.kind, item.id) && item.id !== SAVED_LIST_ID && (!isSingle || !!singleSong);
-  const isSong = target.kind === "song";
+  const isSong = item.kind === "song" || isSingle;
 
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
@@ -100,12 +106,9 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
   };
 
   const toggleSave = () => {
-    if (saved) return removeItem(target.kind, target.id!);
-    if (isSingle)
-      return void resolveSaved({ videoId: singleSong! })
-        .then(saveItem)
-        .catch(() => {});
-    if (isSong) return saveItem({ kind: "song", id: item.id, title: item.title, subtitle: item.subtitle, image: item.image });
+    if (isSingle) return openSavePicker({ id: singleSong! });
+    if (isSong) return openSavePicker({ id: item.id, title: item.title, subtitle: item.subtitle, image: item.image });
+    if (saved) return removeItem(item.kind, item.id);
     // Cards can show "Artist · year" as subtitles: save the list's own details.
     resolveSaved({ listId: item.id })
       .then(saveItem)
@@ -133,14 +136,21 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
         Play next
       </Item>
       {canSave && (
-        <Item onClick={act(toggleSave)} icon={<HeartIcon filled={saved} />}>
-          {saved ? (isSong ? "Remove from Saved" : "Remove from your playlists") : isSong ? "Save" : "Save to your playlists"}
+        <Item onClick={act(toggleSave)} icon={<HeartIcon filled={!isSong && saved} />}>
+          {isSong ? "Save to playlist…" : saved ? "Remove from your playlists" : "Save to your playlists"}
+        </Item>
+      )}
+      {/* Synced lists follow YouTube; only your own ones are edited here. */}
+      {isOwnList(item.id) && (
+        <Item onClick={act(() => openEditPlaylist(item.id))} icon={<EditIcon />}>
+          Edit playlist
         </Item>
       )}
     </motion.div>
   );
 }
 
+const EditIcon = () => <path d="M4 20h4L19 9l-4-4L4 16v4ZM13.5 6.5l4 4" />;
 export const QueueIcon = () => <path d="M4 6h11M4 12h11M4 18h7M17 15l4 3-4 3z" />;
 export const HeartIcon = ({ filled }: { filled: boolean }) => (
   <path

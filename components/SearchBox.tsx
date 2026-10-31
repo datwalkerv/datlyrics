@@ -3,7 +3,8 @@
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { parseYouTubeUrl, targetToQuery } from "@/lib/parse-youtube-url";
-import { removeItem, resolveSaved, saveItem, useSaved } from "@/lib/saved";
+import { useSaved } from "@/lib/saved";
+import { openSavePicker } from "./PlaylistModals";
 import { playHere, playNext } from "./player/remote";
 import type { SearchResult } from "@/lib/search-source";
 
@@ -37,13 +38,8 @@ export function SearchBox({
   const [data, setData] = useState<Results | null>(null);
   const [selected, setSelected] = useState(0);
 
-  const savedSongs = new Set(useSaved().flatMap((x) => (x.kind === "song" ? [x.id] : [])));
-  const toggleSave = (id: string) =>
-    savedSongs.has(id)
-      ? removeItem("song", id)
-      : resolveSaved({ videoId: id })
-          .then(saveItem)
-          .catch(() => {});
+  // Songs in Saved or added to any of your playlists.
+  const savedSongs = new Set(useSaved().flatMap((x) => (x.kind === "song" ? [x.id] : (x.added ?? []).map((a) => a.id))));
 
   const q = query.trim();
   const link = parseYouTubeUrl(q);
@@ -189,7 +185,7 @@ export function SearchBox({
                   >
                     <path d="M4 6h11M4 12h11M4 18h7M17 15l4 3-4 3z" />
                   </ResultAction>
-                  <ResultAction label={savedSongs.has(r.id) ? "Remove from Saved" : "Save"} onClick={() => toggleSave(r.id)}>
+                  <ResultAction label="Save to playlist" onClick={() => openSavePicker({ id: r.id })}>
                     <path
                       d="M12 20.5s-7.5-4.6-7.5-10.1A4.4 4.4 0 0 1 12 7.6a4.4 4.4 0 0 1 7.5 2.8c0 5.5-7.5 10.1-7.5 10.1Z"
                       fill={savedSongs.has(r.id) ? "currentColor" : "none"}

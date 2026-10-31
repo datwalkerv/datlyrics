@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from "react";
 import { insertNext } from "@/lib/queue";
-import { SAVED_LIST_ID, savedSongIds } from "@/lib/saved";
+import { SAVED_LIST_ID, isLocalList, listItem, mergeAdded, ownListIds, savedSongIds } from "@/lib/saved";
 import { YouTubeBridge } from "./bridge";
 
 export type PlayerStatus = "loading" | "playing" | "paused" | "buffering" | "ended" | "error";
@@ -404,7 +404,7 @@ export function useYouTubePlayer(
           origin: window.location.origin,
         };
         // Cue (not play) the playlist just to read its track list.
-        if (listId && listId !== SAVED_LIST_ID) {
+        if (listId && !isLocalList(listId)) {
           playerVars.listType = "playlist";
           playerVars.list = listId;
         }
@@ -501,16 +501,19 @@ export function useYouTubePlayer(
               e.target.setVolume(volumeRef.current);
               if (volumeRef.current === 0) e.target.mute();
               if (!listId) return begin([videoId!], 0);
-              if (listId === SAVED_LIST_ID) {
-                const ids = savedSongIds();
-                if (!ids.length) return sync({ status: "error", error: "No saved songs yet." });
+              if (isLocalList(listId)) {
+                const ids = listId === SAVED_LIST_ID ? savedSongIds() : ownListIds(listId);
+                if (!ids.length)
+                  return sync({ status: "error", error: listId === SAVED_LIST_ID ? "No saved songs yet." : "No songs in this playlist yet." });
                 return begin(ids, Math.max(0, videoId ? ids.indexOf(videoId) : 0));
               }
               let tries = 0;
               listTimer = setInterval(() => {
-                const ids = e.target.getPlaylist?.();
-                if (ids?.length) {
+                const live = e.target.getPlaylist?.();
+                if (live?.length) {
                   clearInterval(listTimer);
+                  // Songs the user added to this saved list play woven in, the latest on top.
+                  const ids = mergeAdded(live, listItem(listId)?.added);
                   const at = videoId ? ids.indexOf(videoId) : 0;
                   if (videoId && at < 0) begin([videoId, ...ids], 0);
                   else begin(ids, Math.max(at, 0));

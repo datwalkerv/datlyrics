@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { parseBackup } from "../backup";
-import { insertNext } from "../queue";
+import { insertNext, mergeAdded } from "../queue";
 import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { pickRedHit } from "../lyrics-source";
@@ -250,5 +250,23 @@ describe("pickRedHit", () => {
     expect(pickRedHit([hit("USCJY1431349", "Blank Space", 231)], "Taylor Swift", "Shake It Off", 219)).toBeNull();
     expect(pickRedHit([hit("USCJY1431349", "Shake It Off", 219, "Someone Else")], "Taylor Swift", "Shake It Off", 219)).toBeNull();
     expect(pickRedHit([hit("../etc/passwd", "Shake It Off", 219)], "Taylor Swift", "Shake It Off", 219)).toBeNull();
+  });
+});
+
+describe("mergeAdded", () => {
+  it("puts the latest added song on top", () => {
+    expect(mergeAdded(["a", "b"], [{ id: "y", before: "x" }, { id: "x", before: "a" }])).toEqual(["y", "x", "a", "b"]);
+  });
+  it("keeps a song above its neighbour when the list grew on top", () => {
+    expect(mergeAdded(["new", "a", "b"], [{ id: "x", before: "a" }])).toEqual(["new", "x", "a", "b"]);
+  });
+  it("goes to the top when its neighbour is gone", () => {
+    expect(mergeAdded(["b"], [{ id: "x", before: "a" }])).toEqual(["x", "b"]);
+  });
+  it("moves a song that is already in the list instead of doubling it", () => {
+    expect(mergeAdded(["a", "b"], [{ id: "b", before: "a" }])).toEqual(["b", "a"]);
+  });
+  it("builds an own list from adds alone", () => {
+    expect(mergeAdded([], [{ id: "y", before: "x" }, { id: "x", before: null }])).toEqual(["y", "x"]);
   });
 });

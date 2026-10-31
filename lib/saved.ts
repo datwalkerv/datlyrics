@@ -1,9 +1,12 @@
 "use client";
 
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { fetchArtwork, fetchVideoInfo } from "@/components/player/useTrackMeta";
 import { cleanTitle } from "./clean-title";
 import { DEMO_PLAYLIST_ID } from "./site";
+import { mergeAdded, type Added } from "./queue";
+
+export { mergeAdded };
 
 export type SavedItem = {
   kind: "song" | "playlist";
@@ -15,13 +18,24 @@ export type SavedItem = {
   savedAt: number;
   /** The card's badge for lists: "Playlist", "Album", "Single" or "EP" (older saves don't have it). */
   badge?: string;
+  /** Songs the user added to this list, newest first, each with the track that was on top when it was added. */
+  added?: Added[];
+  /** When `added` last changed. */
+  updatedAt?: number;
 };
+
+export type { Added };
 
 /** Shown first on everyone's shelf; can't be removed and don't count toward the limit. */
 export const PINNED: Pick<SavedItem, "kind" | "id">[] = [{ kind: "playlist", id: DEMO_PLAYLIST_ID }];
 
 /** The user's own playlist of saved songs, played from localStorage instead of YouTube. */
 export const SAVED_LIST_ID = "saved";
+
+/** The user's own playlists live only in localStorage, under ids like "mine-1a2b3c4d5e6f". */
+export const isOwnList = (id: string) => id.startsWith("mine-");
+/** Lists played from localStorage instead of a YouTube playlist. */
+export const isLocalList = (id: string) => id === SAVED_LIST_ID || isOwnList(id);
 
 export const isPinned = (kind: SavedItem["kind"], id: string) => PINNED.some((x) => x.kind === kind && x.id === id);
 
@@ -86,15 +100,62 @@ export function saveItem(item: Omit<SavedItem, "savedAt">): boolean {
     updateItem(item);
     return true;
   }
-  // The cap is on shelf cards; songs all share the one Saved card.
-  if (item.kind === "playlist" && items.filter((x) => x.kind === "playlist").length >= MAX) return false;
+  // The cap is on shelf cards; songs all share the one Saved card, and pinned lists (kept only for their added songs) don't count.
+  if (item.kind === "playlist" && items.filter((x) => x.kind === "playlist" && !isPinned(x.kind, x.id)).length >= MAX) return false;
   write([...items, { ...item, savedAt: Date.now() }]);
   return true;
 }
 
 export const SAVED_LIMIT = MAX;
 
-export const savedSongIds = () => read().filter((x) => x.kind === "song").map((x) => x.id);
+/** Saved songs, latest saved first. */
+export const savedSongIds = () =>
+  read()
+    .filter((x) => x.kind === "song")
+    .map((x) => x.id)
+    .reverse();
+
+export const listItem = (id: string) => read().find((x) => x.kind === "playlist" && x.id === id);
+
+/** An own list's songs, latest added first. */
+export const ownListIds = (id: string) => mergeAdded([], listItem(id)?.added);
+
+/**
+ * Put a song on top of a list. `top` is the list's current first track (its neighbour). A pinned
+ * list isn't stored until a song is added to it; then it's kept (off the shelf) for its added songs.
+ */
+export function addToList(list: Omit<SavedItem, "savedAt">, songId: string, top: string | null) {
+  const item = listItem(list.id);
+  const base = item ?? list;
+  const added = [{ id: songId, before: top === songId ? null : top }, ...(base.added ?? []).filter((a) => a.id !== songId)];
+  if (item) updateItem({ ...item, added, updatedAt: Date.now() });
+  else if (isPinned(list.kind, list.id)) write([...read(), { ...list, savedAt: 0, added, updatedAt: Date.now() }]);
+}
+
+/** Set an own list's songs, in play order. */
+export function setListSongs(listId: string, ids: string[]) {
+  const item = listItem(listId);
+  if (item) updateItem({ ...item, added: ids.map((id) => ({ id, before: null })), updatedAt: Date.now() });
+}
+
+export function removeFromList(listId: string, songId: string) {
+  const item = listItem(listId);
+  if (!item) return;
+  updateItem({ ...item, added: (item.added ?? []).filter((a) => a.id !== songId), updatedAt: Date.now() });
+}
+
+/** Make an own playlist, optionally with songs (in play order). Returns false when the shelf is full. */
+export function createOwnList(list: { title: string; image: string | null; songs?: string[] }): boolean {
+  return saveItem({
+    kind: "playlist",
+    id: `mine-${crypto.randomUUID().replaceAll("-", "").slice(0, 12)}`,
+    title: list.title,
+    subtitle: "Your playlist",
+    image: list.image,
+    badge: "Playlist",
+    ...(list.songs?.length && { added: list.songs.map((id) => ({ id, before: null })) }),
+  });
+}
 
 /** Replace a saved item's details in place, keeping its position. */
 export function updateItem(item: Omit<SavedItem, "savedAt">) {
@@ -105,10 +166,12 @@ const refreshing = new Set<string>();
 
 /** Re-fetch a playlist's cover (old saves have the first video's thumbnail; cover URLs can expire). */
 export function refreshPlaylistCover(id: string) {
-  if (refreshing.has(id)) return;
+  // Own lists have no YouTube cover; an uploaded one (a data URL) is kept.
+  if (refreshing.has(id) || isLocalList(id) || listItem(id)?.image?.startsWith("data:")) return;
   refreshing.add(id);
   resolveSaved({ listId: id })
-    .then((fresh) => updateItem(fresh))
+    // Keep the user's added songs and title.
+    .then((fresh) => updateItem({ ...fresh, title: listItem(id)?.title ?? fresh.title }))
     .catch(() => {});
 }
 
@@ -148,4 +211,27 @@ export async function resolveSaved(target: { videoId?: string; listId?: string }
     subtitle: song.artist,
     image: art ?? `https://i.ytimg.com/vi/${id}/mqdefault.jpg`,
   };
+}
+
+/** The pinned items' cards, fetched fresh each visit (titles change, cover URLs expire), with the songs added to them. */
+export function usePinned(): SavedItem[] {
+  const [items, setItems] = useState<SavedItem[]>([]);
+  const saved = useSaved();
+  useEffect(() => {
+    let alive = true;
+    Promise.all(
+      PINNED.map((p) =>
+        resolveSaved(p.kind === "playlist" ? { listId: p.id } : { videoId: p.id })
+          .then((item) => ({ ...item, savedAt: 0 }))
+          .catch(() => null),
+      ),
+    ).then((list) => alive && setItems(list.filter((x) => x !== null)));
+    return () => {
+      alive = false;
+    };
+  }, []);
+  return items.map((p) => {
+    const stored = saved.find((x) => x.kind === p.kind && x.id === p.id);
+    return stored ? { ...p, added: stored.added, updatedAt: stored.updatedAt } : p;
+  });
 }

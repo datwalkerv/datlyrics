@@ -2,21 +2,18 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import { useRouter } from "next/navigation";
-import { useEffect, useState } from "react";
+import { useEffect } from "react";
 import { CoverImage } from "@/components/player/CoverImage";
-import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
+import { EMPTY_COVER, openCreatePlaylist } from "@/components/PlaylistModals";
 import { playHere } from "@/components/player/remote";
 import {
-  PINNED,
-  SAVED_LIMIT,
   SAVED_LIST_ID,
   isPinned,
   refreshPlaylistCover,
   removeItem,
-  resolveSaved,
-  saveItem,
   savedHref,
   savedTarget,
+  usePinned,
   useSaved,
   type SavedItem,
 } from "@/lib/saved";
@@ -56,7 +53,7 @@ export function SavedShelf({
   // Playlists saved before covers were fetched show their first video instead; upgrade them once.
   useEffect(() => {
     for (const item of items) {
-      if (!item.image?.includes("/pl_c/") || !item.badge) refreshPlaylistCover(item.id);
+      if (!item.image?.includes("/pl_c/") || !item.badge) refreshPlaylistCover(item.id); // skips own lists and uploaded covers
     }
   }, [items]);
 
@@ -87,25 +84,6 @@ export function SavedShelf({
   );
 }
 
-/** The pinned items' cards, fetched fresh each visit (titles change, cover URLs expire). */
-function usePinned(): SavedItem[] {
-  const [items, setItems] = useState<SavedItem[]>([]);
-  useEffect(() => {
-    let alive = true;
-    Promise.all(
-      PINNED.map((p) =>
-        resolveSaved(p.kind === "playlist" ? { listId: p.id } : { videoId: p.id })
-          .then((item) => ({ ...item, savedAt: 0 }))
-          .catch(() => null),
-      ),
-    ).then((list) => alive && setItems(list.filter((x) => x !== null)));
-    return () => {
-      alive = false;
-    };
-  }, []);
-  return items;
-}
-
 export function SavedCard({
   item,
   pinned = false,
@@ -123,13 +101,14 @@ export function SavedCard({
     <div className={`group relative shrink-0 text-left ${className}`} onContextMenu={onContextMenu}>
       <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`}>
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
+          {!item.image && item.kind === "playlist" && <div className={`h-full w-full ${EMPTY_COVER}`} />}
           {item.image && (
             // Same fallbacks as the player's cover: a missing max-res YouTube thumbnail drops to hqdefault.
             <CoverImage
               src={item.image}
               loading="lazy"
               className="h-full w-full object-cover"
-              onError={() => item.kind === "playlist" && item.id !== SAVED_LIST_ID && refreshPlaylistCover(item.id)}
+              onError={() => item.kind === "playlist" && refreshPlaylistCover(item.id)}
             />
           )}
           <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
@@ -162,77 +141,17 @@ export function SavedCard({
   );
 }
 
+/** Opens the create playlist modal: your own playlist, or one started from a song or playlist link. */
 function AddCard({ className }: { className: string }) {
-  const [open, setOpen] = useState(false);
-  const [value, setValue] = useState("");
-  const [state, setState] = useState<"idle" | "saving" | "error" | "full">("idle");
-
-  const close = () => {
-    setOpen(false);
-    setValue("");
-    setState("idle");
-  };
-
-  const submit = async () => {
-    const target = parseYouTubeUrl(value);
-    if (!target) return setState("error");
-    setState("saving");
-    try {
-      if (!saveItem(await resolveSaved(target))) return setState("full");
-      close();
-    } catch {
-      setState("error");
-    }
-  };
-
-  if (!open) {
-    return (
-      <button onClick={() => setOpen(true)} className={`group text-left ${className}`} title="Save a song or playlist">
-        <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-white/15 text-white/35 transition group-hover:border-white/35 group-hover:text-white/70">
-          <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
-            <path d="M12 5v14M5 12h14" strokeLinecap="round" />
-          </svg>
-        </div>
-        <p className="mt-2 text-sm font-semibold text-white/45">Save</p>
-        <p className="text-xs text-white/30">song or playlist</p>
-      </button>
-    );
-  }
-
   return (
-    <form
-      className="flex w-72 flex-col justify-center gap-2 self-start pt-6"
-      onSubmit={(e) => {
-        e.preventDefault();
-        submit();
-      }}
-    >
-      <input
-        autoFocus
-        value={value}
-        onChange={(e) => {
-          setValue(e.target.value);
-          setState("idle");
-        }}
-        onKeyDown={(e) => e.key === "Escape" && close()}
-        onBlur={() => !value && close()}
-        placeholder="Paste a song or playlist link"
-        aria-label="Song or playlist link to save"
-        spellCheck={false}
-        autoComplete="off"
-        className={`w-full rounded-xl bg-white/[0.06] px-4 py-3 text-sm text-white ring-1 placeholder:text-white/30 focus:outline-none ${
-          state === "error" || state === "full" ? "ring-red-400/60" : "ring-white/15 focus:ring-white/35"
-        }`}
-      />
-      <p className="h-4 text-xs text-white/40">
-        {state === "saving"
-          ? "Saving…"
-          : state === "error"
-            ? "Couldn't save that link."
-            : state === "full"
-              ? `You can save up to ${SAVED_LIMIT}. Remove one first.`
-              : "Enter to save · Esc to cancel"}
-      </p>
-    </form>
+    <button onClick={() => openCreatePlaylist()} className={`group text-left ${className}`} title="Create a playlist">
+      <div className="flex aspect-square w-full items-center justify-center rounded-2xl border border-dashed border-white/15 text-white/35 transition group-hover:border-white/35 group-hover:text-white/70">
+        <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+          <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+        </svg>
+      </div>
+      <p className="mt-2 text-sm font-semibold text-white/45">New playlist</p>
+      <p className="text-xs text-white/30">create or import</p>
+    </button>
   );
 }

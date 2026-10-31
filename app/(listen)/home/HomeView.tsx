@@ -5,7 +5,8 @@ import Link from "next/link";
 import { useCallback, useEffect, useState, type ReactNode } from "react";
 import type { ArtistRelease } from "@/lib/artist-source";
 import { useHistory } from "@/lib/history";
-import { PINNED, SAVED_LIST_ID, isPinned, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
+import { PINNED, isLocalList, isPinned, savedTarget, useSaved, type SavedItem } from "@/lib/saved";
+import { openCreatePlaylist } from "@/components/PlaylistModals";
 import type { RadioTrack } from "@/lib/video-source";
 import { HomeSearch } from "../HomeSearch";
 import { playHere, usePlayerHref } from "@/components/player/remote";
@@ -74,8 +75,18 @@ export function HomeView() {
           <div className="flex min-w-0 flex-1 justify-center">
             <HomeSearch compact />
           </div>
-          {/* Balances the logo so the search sits in the middle. */}
-          <span aria-hidden className="w-[88px] shrink-0 max-lg:hidden" />
+          {/* As wide as the logo, so the search stays in the middle. */}
+          <button
+            onClick={() => openCreatePlaylist()}
+            aria-label="Create playlist"
+            title="Create playlist"
+            className="flex shrink-0 items-center justify-center gap-1.5 rounded-full bg-white/[0.06] px-3 py-2 text-sm font-semibold text-white/80 ring-1 ring-white/10 transition hover:bg-white/10 hover:text-white lg:w-[88px]"
+          >
+            <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" aria-hidden>
+              <path d="M12 5v14M5 12h14" strokeLinecap="round" />
+            </svg>
+            <span className="max-sm:hidden">Create</span>
+          </button>
         </div>
       </header>
 
@@ -218,7 +229,7 @@ function libraryQuery(saved: SavedItem[]): string {
     if (s.kind === "song") {
       const artist = s.subtitle.split(/\s*(?:,|&|\bfeat\.?|\bft\.?|\bwith\b)\s*/i)[0].trim();
       if (artist) params.append("artist", artist);
-    } else if (s.id !== SAVED_LIST_ID && !isPinned(s.kind, s.id)) params.append("list", s.id);
+    } else if (!isLocalList(s.id) && !isPinned(s.kind, s.id)) params.append("list", s.id);
   }
   return params.toString();
 }

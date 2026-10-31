@@ -6,7 +6,7 @@ import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
 import { recordPlay } from "@/lib/history";
-import { SAVED_LIST_ID, isPinned, isSaved, removeItem, resolveSaved, saveItem } from "@/lib/saved";
+import { openSavePicker } from "@/components/PlaylistModals";
 import { Backdrop } from "./Backdrop";
 import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
 import { LyricsToast } from "./LyricsToast";
@@ -234,29 +234,9 @@ export function Player({
     flash(v ? "Shuffle on" : "Shuffle off");
   };
 
-  /** S: save / unsave what's playing (the playlist if one was opened) to the home page shelf. */
-  const toggleSaved = async () => {
-    // Inside the Saved playlist, S (un)saves the current song.
-    if (listId && listId !== SAVED_LIST_ID) {
-      if (isPinned("playlist", listId)) return flash("This playlist is pinned for everyone");
-      if (isSaved("playlist", listId)) {
-        removeItem("playlist", listId);
-        return flash("Removed playlist from saved");
-      }
-      try {
-        flash(saveItem(await resolveSaved({ listId })) ? "Playlist saved" : "Saved list is full");
-      } catch {
-        flash("Couldn't save this playlist");
-      }
-      return;
-    }
-    if (!original || !song) return;
-    if (isSaved("song", original)) {
-      removeItem("song", original);
-      return flash("Removed from saved");
-    }
-    const ok = saveItem({ kind: "song", id: original, title: song.title, subtitle: song.artist, image: artwork });
-    flash(ok ? "Saved" : "Saved list is full");
+  /** S: pick which playlists the song that's playing is saved to. */
+  const toggleSaved = () => {
+    if (original) openSavePicker({ id: original, title: song?.title, subtitle: song?.artist, image: artwork });
   };
 
   /** YouTube Music's Song/Video switch: swap to the other upload, continuing at the same point in the song. */
