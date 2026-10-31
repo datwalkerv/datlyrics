@@ -9,7 +9,8 @@ export type LyricsResult = {
 };
 
 type LrcRecord = {
-  id: number;
+  // datlrc ids are "lrc_<objectId>"; LRCLIB's are numbers.
+  id: number | string;
   trackName: string;
   artistName: string;
   duration: number;
@@ -18,12 +19,13 @@ type LrcRecord = {
   syncedLyrics: string | null;
 };
 
-const LRCLIB = "https://lrclib.net/api";
+// LYRICS_API=https://<datlrc host>/api plus LYRICS_API_KEY serve datlrc's library (it falls back to LRCLIB itself).
+const LRCLIB = process.env.LYRICS_API ?? "https://lrclib.net/api";
 const UA = "datlyrics/0.1 (YouTube lyrics player)";
 
 async function lrclib<T>(path: string, params: Record<string, string>): Promise<T | null> {
   const res = await fetch(`${LRCLIB}${path}?${new URLSearchParams(params)}`, {
-    headers: { "User-Agent": UA, "Lrclib-Client": UA },
+    headers: { "User-Agent": UA, "Lrclib-Client": UA, ...(process.env.LYRICS_API_KEY && { "x-api-key": process.env.LYRICS_API_KEY }) },
   });
   if (res.status === 404) return null;
   // Throw on other failures so a transient outage isn't cached as "no lyrics".
@@ -52,7 +54,7 @@ function firstLineTime(r: LrcRecord): number | null {
   return line?.time ?? null;
 }
 
-function pickBest(records: LrcRecord[], title: string, duration: number): LrcRecord | null {
+export function pickBest(records: LrcRecord[], title: string, duration: number): LrcRecord | null {
   let best: LrcRecord | null = null;
   let bestScore = -Infinity;
   for (const r of records) {
@@ -62,6 +64,8 @@ function pickBest(records: LrcRecord[], title: string, duration: number): LrcRec
     // Music videos often run long (intros/outros), so tolerate drift but prefer close matches.
     if (diff > 45) continue;
     let score = (r.syncedLyrics ? 100 : 0) - Math.min(diff, 45) * 2;
+    // A datlrc record ("lrc_…" id) synced on an upload of this length was timed by hand for it: it wins.
+    if (typeof r.id === "string" && diff <= 2) score += 50;
     // People often upload the album timing under a music video's length. A timeline that mostly
     // appears on uploads of a clearly different length is borrowed, not timed for this one;
     // one confirmed by several same-length uploads is more trustworthy.
@@ -112,7 +116,7 @@ export async function findLyrics(artist: string, title: string, duration: number
       : null,
     artist ? lrclib<LrcRecord[]>("/search", { track_name: withoutFeat(title), artist_name: artist }) : null,
   ]);
-  const seen = new Set<number>();
+  const seen = new Set<number | string>();
   const add = (rs: (LrcRecord | null)[]) => {
     for (const r of rs) {
       if (!r || seen.has(r.id)) continue;

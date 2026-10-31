@@ -3,6 +3,7 @@ import { parseBackup } from "../backup";
 import { insertNext } from "../queue";
 import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
+import { pickBest } from "../lyrics-source";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseYouTubeUrl } from "../parse-youtube-url";
 import { mergeResults } from "../search-source";
@@ -233,5 +234,27 @@ describe("insertNext", () => {
   });
   it("leaves the queue alone for the current track", () => {
     expect(insertNext(["a", "b"], 1, ["b"])).toEqual({ queue: ["a", "b"], index: 1 });
+  });
+});
+
+describe("pickBest", () => {
+  const rec = (id: number | string, duration: number, first: number) => ({
+    id,
+    trackName: "Song",
+    artistName: "Artist",
+    duration,
+    instrumental: false,
+    plainLyrics: "a",
+    syncedLyrics: `[00:${String(first).padStart(2, "0")}.00]a`,
+  });
+
+  it("prefers a datlrc record timed for this upload over LRCLIB ones", () => {
+    // Three same-length LRCLIB uploads agree with each other, which earns them a trust bonus.
+    const lrclib = [rec(1, 200, 10), rec(2, 200, 10), rec(3, 201, 10)];
+    expect(pickBest([...lrclib, rec("lrc_a", 200, 12)], "Song", 200)?.id).toBe("lrc_a");
+  });
+
+  it("doesn't let a datlrc record for a different-length upload win", () => {
+    expect(pickBest([rec(1, 200, 10), rec("lrc_a", 215, 12)], "Song", 200)?.id).toBe(1);
   });
 });
