@@ -125,43 +125,27 @@ export const isEmptyList = (id: string) =>
   isLocalList(id) && (id === SAVED_LIST_ID ? savedSongIds() : ownListIds(id)).length === 0;
 
 /**
- * Put a song on top of a list. `top` is the list's current first track (its neighbour). A pinned
+ * Put a song on top of a list's added songs (which play before a synced list's own tracks). A pinned
  * list isn't stored until a song is added to it; then it's kept (off the shelf) for its added songs.
  */
-export function addToList(list: Omit<SavedItem, "savedAt">, songId: string, top: string | null) {
+export function addToList(list: Omit<SavedItem, "savedAt">, songId: string) {
   const item = listItem(list.id);
   const base = item ?? list;
-  const added = [{ id: songId, before: top === songId ? null : top }, ...(base.added ?? []).filter((a) => a.id !== songId)];
+  const added = [{ id: songId }, ...(base.added ?? []).filter((a) => a.id !== songId)];
   if (item) updateItem({ ...item, added, updatedAt: Date.now() });
   else if (isPinned(list.kind, list.id)) write([...read(), { ...list, savedAt: 0, added, updatedAt: Date.now() }]);
 }
 
-/**
- * Set a list's added songs, top first. An own list is just that order. On a synced list they're
- * chained above one another, the block staying above the YouTube track it sat on.
- */
+/** Set a list's added songs, in play order. */
 export function setListSongs(listId: string, ids: string[]) {
   const item = listItem(listId);
-  if (!item) return;
-  const own = isOwnList(listId);
-  const addedIds = new Set(item.added?.map((a) => a.id));
-  // The oldest add that points at a YouTube track (not another added song) holds the block's spot.
-  const anchor = own
-    ? null
-    : ([...(item.added ?? [])].reverse().find((a) => !a.before || !addedIds.has(a.before))?.before ?? null);
-  const added = ids.map((id, i) => ({ id, before: own ? null : (ids[i + 1] ?? anchor) }));
-  updateItem({ ...item, added, updatedAt: Date.now() });
+  if (item) updateItem({ ...item, added: ids.map((id) => ({ id })), updatedAt: Date.now() });
 }
 
 export function removeFromList(listId: string, songId: string) {
   const item = listItem(listId);
   if (!item) return;
-  const gone = item.added?.find((a) => a.id === songId);
-  // Songs that sat right above the removed one take its neighbour, so they keep their spot.
-  const added = (item.added ?? [])
-    .filter((a) => a.id !== songId)
-    .map((a) => (a.before === songId ? { ...a, before: gone?.before ?? null } : a));
-  updateItem({ ...item, added, updatedAt: Date.now() });
+  updateItem({ ...item, added: (item.added ?? []).filter((a) => a.id !== songId), updatedAt: Date.now() });
 }
 
 /** Make an own playlist, optionally with songs (in play order). Returns false when the shelf is full. */
@@ -173,7 +157,7 @@ export function createOwnList(list: { title: string; image: string | null; songs
     subtitle: "Your playlist",
     image: list.image,
     badge: "Playlist",
-    ...(list.songs?.length && { added: list.songs.map((id) => ({ id, before: null })) }),
+    ...(list.songs?.length && { added: list.songs.map((id) => ({ id })) }),
   });
 }
 

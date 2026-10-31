@@ -12,20 +12,12 @@ export function insertNext(queue: string[], at: number, ids: string[]): { queue:
   return { queue: next, index };
 }
 
-/** A song the user added to a list, and the track that was on top when they did. */
-export type Added = { id: string; before: string | null };
+/** A song the user added to a list. (Older saves also carry a `before` neighbour, now unused.) */
+export type Added = { id: string };
 
-/**
- * A list's tracks with the user's added songs woven in: oldest add first, each goes right above the
- * track that was on top when it was added (its neighbour), or to the top if that track is gone.
- */
+/** A list's tracks with the user's added songs first, in their order, and each track once. */
 export function mergeAdded(live: string[], added: Added[] = []): string[] {
-  const list = [...live];
-  for (const a of [...added].reverse()) {
-    const had = list.indexOf(a.id);
-    if (had >= 0) list.splice(had, 1);
-    const at = a.before ? list.indexOf(a.before) : -1;
-    list.splice(Math.max(at, 0), 0, a.id);
-  }
-  return list;
+  const ids = added.map((a) => a.id);
+  const first = new Set(ids);
+  return [...new Set(ids), ...live.filter((id) => !first.has(id))];
 }

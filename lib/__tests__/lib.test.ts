@@ -254,19 +254,13 @@ describe("pickRedHit", () => {
 });
 
 describe("mergeAdded", () => {
-  it("puts the latest added song on top", () => {
-    expect(mergeAdded(["a", "b"], [{ id: "y", before: "x" }, { id: "x", before: "a" }])).toEqual(["y", "x", "a", "b"]);
+  it("plays added songs first, in their order, then the list", () => {
+    expect(mergeAdded(["a", "b"], [{ id: "y" }, { id: "x" }])).toEqual(["y", "x", "a", "b"]);
   });
-  it("keeps a song above its neighbour when the list grew on top", () => {
-    expect(mergeAdded(["new", "a", "b"], [{ id: "x", before: "a" }])).toEqual(["new", "x", "a", "b"]);
+  it("plays a song that is also in the list once, with the added ones", () => {
+    expect(mergeAdded(["a", "b"], [{ id: "b" }])).toEqual(["b", "a"]);
   });
-  it("goes to the top when its neighbour is gone", () => {
-    expect(mergeAdded(["b"], [{ id: "x", before: "a" }])).toEqual(["x", "b"]);
-  });
-  it("moves a song that is already in the list instead of doubling it", () => {
-    expect(mergeAdded(["a", "b"], [{ id: "b", before: "a" }])).toEqual(["b", "a"]);
-  });
-  it("builds an own list from adds alone", () => {
-    expect(mergeAdded([], [{ id: "y", before: "x" }, { id: "x", before: null }])).toEqual(["y", "x"]);
+  it("is just the added songs for an own list", () => {
+    expect(mergeAdded([], [{ id: "y" }, { id: "x" }])).toEqual(["y", "x"]);
   });
 });

@@ -445,10 +445,7 @@ function SavePicker({ song, onClose, onAdded }: { song: PickerSong; onClose: () 
   const toggleList = async (list: SavedItem) => {
     if (list.added?.some((a) => a.id === song.id)) return removeFromList(list.id, song.id);
     setBusy(list.id);
-    // Own lists keep their order in `added`; a linked list needs its live top track as the neighbour.
-    // The neighbour is what plays first right now, added songs included, so the new one lands above it.
-    const top = isOwnList(list.id) ? null : (mergeAdded(await listTracks(list.id), list.added)[0] ?? null);
-    addToList(list, song.id, top);
+    addToList(list, song.id);
     onAdded(`${await songTitle()} added to ${list.title}`);
   };
 
@@ -579,7 +576,7 @@ function EditModal({ card, onClose }: { card: SavedItem; onClose: () => void }) 
           <span className="min-w-0">
             <span className="block truncate font-semibold text-white/90">{list.title}</span>
             <span className="block text-xs text-white/40">
-              Synced with YouTube. You can reorder and remove the {ids.length || ""} song{ids.length === 1 ? "" : "s"} you added.
+              Synced with YouTube. The {ids.length || ""} song{ids.length === 1 ? "" : "s"} you added play first; you can reorder or remove them.
             </span>
           </span>
         </div>

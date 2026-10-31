@@ -515,7 +515,7 @@ export function useYouTubePlayer(
                 else begin(ids, Math.max(at, 0));
               };
               if (added?.length) {
-                // Songs the user added play woven in, the latest on top. The embed isn't cued with the
+                // Songs the user added play first, the latest on top. The embed isn't cued with the
                 // YouTube list here: still loading it, it would ignore our queue and play the list's own first track.
                 // shortcut: our API returns the list's first page of tracks (~100); a longer list plays only that far.
                 void fetch(`/api/playlist/${listId}/tracks`)
