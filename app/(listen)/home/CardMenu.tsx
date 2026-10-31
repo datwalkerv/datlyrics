@@ -1,7 +1,7 @@
 "use client";
 
 import { motion } from "motion/react";
-import { useEffect, useRef } from "react";
+import { useEffect, useRef, useState } from "react";
 import { isPlayerLoaded, playHere, playNext } from "@/components/player/remote";
 import {
   SAVED_LIST_ID,
@@ -29,6 +29,13 @@ export function menuAt(e: React.MouseEvent, item: SavedItem): CardMenuState {
   return { x: fromKeyboard ? box.left + 12 : e.clientX, y: fromKeyboard ? box.top + 12 : e.clientY, item };
 }
 
+/** A playlist's track ids, or none if the lookup fails. */
+const listTracks = (listId: string): Promise<string[]> =>
+  fetch(`/api/playlist/${listId}/tracks`)
+    .then((res) => (res.ok ? (res.json() as Promise<{ ids: string[] }>) : { ids: [] }))
+    .then((d) => d.ids)
+    .catch(() => []);
+
 /** Queue a song, or every track of a list, after what's playing; with nothing playing, start it. */
 async function queueNext(item: SavedItem) {
   if (item.kind === "song") {
@@ -36,24 +43,31 @@ async function queueNext(item: SavedItem) {
     return;
   }
   if (!isPlayerLoaded()) return playHere(savedTarget(item));
-  const ids =
-    item.id === SAVED_LIST_ID
-      ? savedSongIds()
-      : await fetch(`/api/playlist/${item.id}/tracks`)
-          .then((res) => (res.ok ? (res.json() as Promise<{ ids: string[] }>) : { ids: [] }))
-          .then((d) => d.ids)
-          .catch(() => []);
-  playNext(ids);
+  playNext(item.id === SAVED_LIST_ID ? savedSongIds() : await listTracks(item.id));
 }
 
 /** Play next and save/unsave for a card's song or list, at the pointer, kept inside the window. */
 export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () => void }) {
   const ref = useRef<HTMLDivElement>(null);
   const { item } = menu;
-  const saved = useSaved().some((x) => x.kind === item.kind && x.id === item.id);
+  // A single is saved as its song, into the Saved list, not as a one-track playlist card.
+  const isSingle = item.kind === "playlist" && item.badge === "Single";
+  const [singleSong, setSingleSong] = useState<string | null>(null);
+  useEffect(() => {
+    if (!isSingle) return;
+    let alive = true;
+    // shortcut: a single's first track is its title song; B-sides aren't saved.
+    listTracks(item.id).then((ids) => alive && setSingleSong(ids[0] ?? null));
+    return () => {
+      alive = false;
+    };
+  }, [isSingle, item.id]);
+  const target = isSingle ? { kind: "song" as const, id: singleSong } : item;
+  const saved = useSaved().some((x) => x.kind === target.kind && x.id === target.id);
   // The pinned demo and the Saved songs list are always on the shelf: nothing to save or remove.
-  const canSave = !isPinned(item.kind, item.id) && item.id !== SAVED_LIST_ID;
-  const isSong = item.kind === "song";
+  // A single's menu offers saving once its song is known.
+  const canSave = !isPinned(item.kind, item.id) && item.id !== SAVED_LIST_ID && (!isSingle || !!singleSong);
+  const isSong = target.kind === "song";
 
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
@@ -86,7 +100,11 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
   };
 
   const toggleSave = () => {
-    if (saved) return removeItem(item.kind, item.id);
+    if (saved) return removeItem(target.kind, target.id!);
+    if (isSingle)
+      return void resolveSaved({ videoId: singleSong! })
+        .then(saveItem)
+        .catch(() => {});
     if (isSong) return saveItem({ kind: "song", id: item.id, title: item.title, subtitle: item.subtitle, image: item.image });
     // Cards can show "Artist · year" as subtitles: save the list's own details.
     resolveSaved({ listId: item.id })
