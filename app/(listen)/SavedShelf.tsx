@@ -137,7 +137,8 @@ export function SavedCard({
               <path d="M8 5.5v13a1 1 0 0 0 1.5.86l11-6.5a1 1 0 0 0 0-1.72l-11-6.5A1 1 0 0 0 8 5.5Z" />
             </svg>
           </div>
-          {item.kind === "playlist" && (
+          {/* A single plays like a song: no badge. */}
+          {item.kind === "playlist" && item.badge !== "Single" && (
             <span className="absolute bottom-1.5 left-1.5 rounded-md bg-black/60 px-1.5 py-0.5 text-[10px] font-semibold uppercase tracking-wide text-white/80 backdrop-blur">
               {item.badge ?? "Playlist"}
             </span>
