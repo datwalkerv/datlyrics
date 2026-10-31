@@ -141,9 +141,9 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
           {isSong ? "Save to playlist…" : saved ? "Remove from your playlists" : "Save to your playlists"}
         </Item>
       )}
-      {/* Synced lists follow YouTube; only your own ones are edited here. */}
-      {isOwnList(item.id) && (
-        <Item onClick={act(() => openEditPlaylist(item.id))} icon={<EditIcon />}>
+      {/* Your own lists, and synced ones on your shelf (pinned included) for the songs you added. */}
+      {item.kind === "playlist" && !isSingle && (isOwnList(item.id) || isPinned(item.kind, item.id) || saved) && (
+        <Item onClick={act(() => openEditPlaylist(item))} icon={<EditIcon />}>
           Edit playlist
         </Item>
       )}

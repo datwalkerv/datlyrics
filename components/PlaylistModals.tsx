@@ -45,16 +45,21 @@ export function blockEmpty(listId: string) {
 export const EMPTY_COVER = "bg-gradient-to-b from-[#191919] to-[#080808]";
 
 /** The song the picker saves; details are looked up when missing. */
-export type PickerSong = { id: string; title?: string; subtitle?: string; image?: string | null };
+export type PickerSong = {
+  id: string;
+  title?: string;
+  subtitle?: string;
+  image?: string | null;
+};
 
 /** Open the create playlist modal from anywhere, optionally starting from a song. */
 export function openCreatePlaylist(songId?: string) {
   window.dispatchEvent(new CustomEvent(CREATE_EVENT, { detail: songId }));
 }
 
-/** Rename, re-cover and reorder one of your own (not synced) playlists. */
-export function openEditPlaylist(listId: string) {
-  window.dispatchEvent(new CustomEvent(EDIT_EVENT, { detail: listId }));
+/** Edit a playlist: your own ones fully; synced ones only in the songs you added to them. */
+export function openEditPlaylist(list: SavedItem) {
+  window.dispatchEvent(new CustomEvent(EDIT_EVENT, { detail: list }));
 }
 
 /** Ask which playlist to save a song to. */
@@ -65,7 +70,7 @@ export function openSavePicker(song: PickerSong) {
 export function PlaylistModals() {
   const [create, setCreate] = useState<{ songId?: string } | null>(null);
   const [pick, setPick] = useState<PickerSong | null>(null);
-  const [edit, setEdit] = useState<string | null>(null);
+  const [edit, setEdit] = useState<SavedItem | null>(null);
   const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
   const flash = (text: string) => {
     const id = Date.now();
@@ -83,7 +88,7 @@ export function PlaylistModals() {
       setCreate({ songId: (e as CustomEvent<string | undefined>).detail });
     };
     const onPick = (e: Event) => setPick((e as CustomEvent<PickerSong>).detail);
-    const onEdit = (e: Event) => setEdit((e as CustomEvent<string>).detail);
+    const onEdit = (e: Event) => setEdit((e as CustomEvent<SavedItem>).detail);
     const onToast = (e: Event) => flashRef.current((e as CustomEvent<string>).detail);
     window.addEventListener(TOAST_EVENT, onToast);
     window.addEventListener(CREATE_EVENT, onCreate);
@@ -123,7 +128,7 @@ export function PlaylistModals() {
           }}
         />
       )}
-      {edit && <EditModal key={`edit:${edit}`} listId={edit} onClose={() => setEdit(null)} />}
+      {edit && <EditModal key={`edit:${edit.id}`} card={edit} onClose={() => setEdit(null)} />}
     </AnimatePresence>
   );
 }
@@ -189,7 +194,14 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
 
   const create = () => {
     if (!name.trim()) return setCreated("error");
-    if (!createOwnList({ title: name.trim(), image: cover, songs: songId ? [songId] : [] })) return setCreated("full");
+    if (
+      !createOwnList({
+        title: name.trim(),
+        image: cover,
+        songs: songId ? [songId] : [],
+      })
+    )
+      return setCreated("full");
     onClose();
   };
 
@@ -209,7 +221,11 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
         }
       } else {
         const song = await resolveSaved({ videoId: target.videoId! });
-        ok = createOwnList({ title: song.title, image: song.image, songs: [song.id] });
+        ok = createOwnList({
+          title: song.title,
+          image: song.image,
+          songs: [song.id],
+        });
       }
       if (!ok) return setImported("full");
       onClose();
@@ -393,16 +409,23 @@ function SavePicker({ song, onClose, onAdded }: { song: PickerSong; onClose: () 
   const inSaved = saved.some((x) => x.kind === "song" && x.id === song.id);
   const pinned = usePinned();
   // Pinned lists are synced ones too: songs can be added to them.
-  const lists = [...pinned, ...saved.filter((x) => x.kind === "playlist" && !isPinned(x.kind, x.id) && x.badge !== "Single")].sort(
-    (a, b) => (b.updatedAt ?? b.savedAt) - (a.updatedAt ?? a.savedAt),
-  );
+  const lists = [
+    ...pinned,
+    ...saved.filter((x) => x.kind === "playlist" && !isPinned(x.kind, x.id) && x.badge !== "Single"),
+  ].sort((a, b) => (b.updatedAt ?? b.savedAt) - (a.updatedAt ?? a.savedAt));
 
   const toggleSaved = async () => {
     if (inSaved) return removeItem("song", song.id);
     setBusy("saved");
     try {
       const item = song.title
-        ? { kind: "song" as const, id: song.id, title: song.title, subtitle: song.subtitle ?? "", image: song.image ?? null }
+        ? {
+            kind: "song" as const,
+            id: song.id,
+            title: song.title,
+            subtitle: song.subtitle ?? "",
+            image: song.image ?? null,
+          }
         : await resolveSaved({ videoId: song.id });
       saveItem(item);
       onAdded(`${item.title} added to Saved`);
@@ -423,7 +446,8 @@ function SavePicker({ song, onClose, onAdded }: { song: PickerSong; onClose: () 
     if (list.added?.some((a) => a.id === song.id)) return removeFromList(list.id, song.id);
     setBusy(list.id);
     // Own lists keep their order in `added`; a linked list needs its live top track as the neighbour.
-    const top = isOwnList(list.id) ? null : ((await listTracks(list.id))[0] ?? null);
+    // The neighbour is what plays first right now, added songs included, so the new one lands above it.
+    const top = isOwnList(list.id) ? null : (mergeAdded(await listTracks(list.id), list.added)[0] ?? null);
     addToList(list, song.id, top);
     onAdded(`${await songTitle()} added to ${list.title}`);
   };
@@ -431,7 +455,14 @@ function SavePicker({ song, onClose, onAdded }: { song: PickerSong; onClose: () 
   return (
     <Modal title="Save to playlist" onClose={onClose}>
       <div className="-mx-2 flex max-h-[50vh] flex-col overflow-y-auto">
-        <Row title="Saved" subtitle="Your saved songs" image="/saved.svg" checked={inSaved} busy={busy === "saved"} onClick={toggleSaved} />
+        <Row
+          title="Saved"
+          subtitle="Your saved songs"
+          image="/saved.svg"
+          checked={inSaved}
+          busy={busy === "saved"}
+          onClick={toggleSaved}
+        />
         {lists.map((list) => (
           <Row
             key={list.id}
@@ -481,8 +512,12 @@ function Row({
       className="flex items-center gap-3 rounded-xl px-2 py-2 text-left outline-none transition hover:bg-white/10 focus-visible:bg-white/10 disabled:opacity-60"
     >
       <span className="size-11 shrink-0 overflow-hidden rounded-lg bg-white/5 ring-1 ring-white/10">
-        {/* eslint-disable-next-line @next/next/no-img-element */}
-        {image ? <img src={image} alt="" className="h-full w-full object-cover" /> : <span className={`block h-full w-full ${EMPTY_COVER}`} />}
+        {image ? (
+          // eslint-disable-next-line @next/next/no-img-element
+          <img src={image} alt="" className="h-full w-full object-cover" />
+        ) : (
+          <span className={`block h-full w-full ${EMPTY_COVER}`} />
+        )}
       </span>
       <span className="min-w-0 flex-1">
         <span className="block truncate text-sm font-semibold text-white/90">{title}</span>
@@ -505,8 +540,13 @@ function Row({
 }
 
 /** One of your own playlists: name, cover and songs (drag or Alt+↑/↓ to reorder, × to remove). Changes save as you make them. */
-function EditModal({ listId, onClose }: { listId: string; onClose: () => void }) {
-  const list = useSaved().find((x) => x.kind === "playlist" && x.id === listId);
+function EditModal({ card, onClose }: { card: SavedItem; onClose: () => void }) {
+  const listId = card.id;
+  const stored = useSaved().find((x) => x.kind === "playlist" && x.id === listId);
+  // A pinned list is only stored once a song is added to it; until then its card stands in.
+  const list = stored ?? (isPinned("playlist", listId) ? card : undefined);
+  // Synced lists follow YouTube: only the songs you added can be reordered or removed.
+  const synced = !isOwnList(listId);
   const [badFile, setBadFile] = useState(false);
   // The list was removed meanwhile (another tab, a backup import).
   useEffect(() => {
@@ -526,57 +566,81 @@ function EditModal({ listId, onClose }: { listId: string; onClose: () => void })
 
   return (
     <Modal title="Edit playlist" onClose={onClose}>
-      <div className="flex gap-4">
-        <label className="group relative size-28 shrink-0 cursor-pointer overflow-hidden rounded-2xl ring-1 ring-white/10 focus-within:ring-2 focus-within:ring-white/35">
-          {list.image ? (
-            // eslint-disable-next-line @next/next/no-img-element
-            <img src={list.image} alt="" className="h-full w-full object-cover" />
-          ) : (
-            <span className={`block h-full w-full ${EMPTY_COVER}`} />
-          )}
-          <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
-            Change cover
+      {synced ? (
+        <div className="flex items-center gap-4">
+          <span className="size-20 shrink-0 overflow-hidden rounded-2xl ring-1 ring-white/10">
+            {list.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={list.image} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className={`block h-full w-full ${EMPTY_COVER}`} />
+            )}
           </span>
-          <input
-            type="file"
-            accept="image/*"
-            className="sr-only"
-            aria-label="Change cover"
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              if (!file) return;
-              try {
-                set({ image: await squareCover(file) });
-                setBadFile(false);
-              } catch {
-                setBadFile(true);
-              }
-            }}
-          />
-        </label>
-        <div className="flex min-w-0 flex-1 flex-col gap-2">
-          <input
-            defaultValue={list.title}
-            onChange={(e) => e.target.value.trim() && set({ title: e.target.value.trim() })}
-            placeholder="Playlist name"
-            aria-label="Playlist name"
-            maxLength={80}
-            autoComplete="off"
-            className={INPUT}
-          />
-          <p className="text-xs text-white/40">
-            {badFile ? "Couldn't read that image." : `${ids.length} song${ids.length === 1 ? "" : "s"}`}
-          </p>
-          {list.image && (
-            <button onClick={() => set({ image: null })} className="self-start text-xs font-semibold text-white/50 hover:text-white">
-              Remove cover
-            </button>
-          )}
+          <span className="min-w-0">
+            <span className="block truncate font-semibold text-white/90">{list.title}</span>
+            <span className="block text-xs text-white/40">
+              Synced with YouTube. You can reorder and remove the {ids.length || ""} song{ids.length === 1 ? "" : "s"} you added.
+            </span>
+          </span>
         </div>
-      </div>
+      ) : (
+        <div className="flex gap-4">
+          <label className="group relative size-28 shrink-0 cursor-pointer overflow-hidden rounded-2xl ring-1 ring-white/10 focus-within:ring-2 focus-within:ring-white/35">
+            {list.image ? (
+              // eslint-disable-next-line @next/next/no-img-element
+              <img src={list.image} alt="" className="h-full w-full object-cover" />
+            ) : (
+              <span className={`block h-full w-full ${EMPTY_COVER}`} />
+            )}
+            <span className="absolute inset-0 flex items-center justify-center bg-black/50 text-xs font-semibold opacity-0 transition group-hover:opacity-100 group-focus-within:opacity-100">
+              Change cover
+            </span>
+            <input
+              type="file"
+              accept="image/*"
+              className="sr-only"
+              aria-label="Change cover"
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                if (!file) return;
+                try {
+                  set({ image: await squareCover(file) });
+                  setBadFile(false);
+                } catch {
+                  setBadFile(true);
+                }
+              }}
+            />
+          </label>
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
+            <input
+              defaultValue={list.title}
+              onChange={(e) => e.target.value.trim() && set({ title: e.target.value.trim() })}
+              placeholder="Playlist name"
+              aria-label="Playlist name"
+              maxLength={80}
+              autoComplete="off"
+              className={INPUT}
+            />
+            <p className="text-xs text-white/40">
+              {badFile ? "Couldn't read that image." : `${ids.length} song${ids.length === 1 ? "" : "s"}`}
+            </p>
+            {list.image && (
+              <button
+                onClick={() => set({ image: null })}
+                className="self-start text-xs font-semibold text-white/50 hover:text-white"
+              >
+                Remove cover
+              </button>
+            )}
+          </div>
+        </div>
+      )}
       <motion.div layoutScroll className="-mx-2 mt-5 max-h-[40vh] overflow-y-auto">
         {ids.length === 0 ? (
-          <p className="px-2 py-6 text-center text-sm text-white/40">No songs yet. Press S while a song plays to add it.</p>
+          <p className="px-2 py-6 text-center text-sm text-white/40">
+            {synced ? "No songs added yet." : "No songs yet."} Press S while a song plays to add one.
+          </p>
         ) : (
           <Reorder.Group axis="y" values={ids} onReorder={(next) => setListSongs(listId, next)} className="flex flex-col">
             {ids.map((id) => (

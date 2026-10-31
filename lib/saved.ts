@@ -136,16 +136,32 @@ export function addToList(list: Omit<SavedItem, "savedAt">, songId: string, top:
   else if (isPinned(list.kind, list.id)) write([...read(), { ...list, savedAt: 0, added, updatedAt: Date.now() }]);
 }
 
-/** Set an own list's songs, in play order. */
+/**
+ * Set a list's added songs, top first. An own list is just that order. On a synced list they're
+ * chained above one another, the block staying above the YouTube track it sat on.
+ */
 export function setListSongs(listId: string, ids: string[]) {
   const item = listItem(listId);
-  if (item) updateItem({ ...item, added: ids.map((id) => ({ id, before: null })), updatedAt: Date.now() });
+  if (!item) return;
+  const own = isOwnList(listId);
+  const addedIds = new Set(item.added?.map((a) => a.id));
+  // The oldest add that points at a YouTube track (not another added song) holds the block's spot.
+  const anchor = own
+    ? null
+    : ([...(item.added ?? [])].reverse().find((a) => !a.before || !addedIds.has(a.before))?.before ?? null);
+  const added = ids.map((id, i) => ({ id, before: own ? null : (ids[i + 1] ?? anchor) }));
+  updateItem({ ...item, added, updatedAt: Date.now() });
 }
 
 export function removeFromList(listId: string, songId: string) {
   const item = listItem(listId);
   if (!item) return;
-  updateItem({ ...item, added: (item.added ?? []).filter((a) => a.id !== songId), updatedAt: Date.now() });
+  const gone = item.added?.find((a) => a.id === songId);
+  // Songs that sat right above the removed one take its neighbour, so they keep their spot.
+  const added = (item.added ?? [])
+    .filter((a) => a.id !== songId)
+    .map((a) => (a.before === songId ? { ...a, before: gone?.before ?? null } : a));
+  updateItem({ ...item, added, updatedAt: Date.now() });
 }
 
 /** Make an own playlist, optionally with songs (in play order). Returns false when the shelf is full. */
