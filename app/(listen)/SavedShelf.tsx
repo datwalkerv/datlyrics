@@ -32,11 +32,10 @@ export function SavedShelf({
 }) {
   const home = variant === "home";
   const width = home ? "w-36 sm:w-40" : "w-28";
-  // /home shows only the user's own playlists, not the app's pinned ones.
-  const pinned = usePinned(!home);
+  const pinned = usePinned();
   // A pinned item the user also saved shows once, as the pinned card.
   const saved = useSaved();
-  const items = saved.filter((x) => x.kind === "playlist" && (home || !isPinned(x.kind, x.id)));
+  const items = saved.filter((x) => x.kind === "playlist" && !isPinned(x.kind, x.id));
   const songCount = saved.filter((x) => x.kind === "song").length;
   const savedSongs: SavedItem = {
     kind: "playlist",
@@ -89,10 +88,9 @@ export function SavedShelf({
 }
 
 /** The pinned items' cards, fetched fresh each visit (titles change, cover URLs expire). */
-function usePinned(enabled: boolean): SavedItem[] {
+function usePinned(): SavedItem[] {
   const [items, setItems] = useState<SavedItem[]>([]);
   useEffect(() => {
-    if (!enabled) return;
     let alive = true;
     Promise.all(
       PINNED.map((p) =>
@@ -104,7 +102,7 @@ function usePinned(enabled: boolean): SavedItem[] {
     return () => {
       alive = false;
     };
-  }, [enabled]);
+  }, []);
   return items;
 }
 
