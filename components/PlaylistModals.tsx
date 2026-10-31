@@ -171,43 +171,50 @@ function Modal({ title, onClose, children }: { title: string; onClose: () => voi
 const INPUT =
   "w-full rounded-xl bg-white/[0.06] px-4 py-3 text-sm text-white ring-1 ring-white/15 placeholder:text-white/30 focus:outline-none focus:ring-white/35";
 
-/** A new playlist: your own (name, cover, maybe a first song), or a linked YouTube playlist from its link. */
+type Status = "idle" | "saving" | "error" | "full" | "badfile";
+
+/**
+ * Two ways to a new playlist: create your own (name, cover; starting with the song being saved, if
+ * any), or import one from a song or playlist link.
+ */
 function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void }) {
   const [name, setName] = useState("");
-  const [link, setLink] = useState(songId ? `https://youtu.be/${songId}` : "");
   const [cover, setCover] = useState<string | null>(null);
+  const [link, setLink] = useState("");
   const [synced, setSynced] = useState(true);
-  const [state, setState] = useState<"idle" | "saving" | "error" | "full" | "badfile">("idle");
-  const isListLink = !!parseYouTubeUrl(link.trim())?.listId;
+  // Each section has its own message, so an error shows next to what caused it.
+  const [created, setCreated] = useState<Status>("idle");
+  const [imported, setImported] = useState<Status>("idle");
+  const target = parseYouTubeUrl(link.trim());
 
-  const submit = async () => {
-    const target = link.trim() ? parseYouTubeUrl(link.trim()) : null;
-    if (link.trim() && !target) return setState("error");
-    if (!target && !name.trim()) return setState("error");
-    setState("saving");
+  const create = () => {
+    if (!name.trim()) return setCreated("error");
+    if (!createOwnList({ title: name.trim(), image: cover, songs: songId ? [songId] : [] })) return setCreated("full");
+    onClose();
+  };
+
+  const importLink = async () => {
+    if (!target) return setImported("error");
+    setImported("saving");
     try {
       let ok: boolean;
-      if (target?.listId) {
+      if (target.listId) {
         const list = await resolveSaved({ listId: target.listId });
-        const title = name.trim() || list.title;
-        const image = cover ?? list.image;
-        if (synced) ok = saveItem({ ...list, title, image });
+        if (synced) ok = saveItem(list);
         else {
           // Not synced: copy today's tracks into your own playlist, to edit freely.
           const songs = await listTracks(target.listId);
           if (!songs.length) throw new Error("no tracks");
-          ok = createOwnList({ title, image, songs });
+          ok = createOwnList({ title: list.title, image: list.image, songs });
         }
-      } else if (target?.videoId) {
-        const song = await resolveSaved({ videoId: target.videoId });
-        ok = createOwnList({ title: name.trim() || song.title, image: cover ?? song.image, songs: [song.id] });
       } else {
-        ok = createOwnList({ title: name.trim(), image: cover });
+        const song = await resolveSaved({ videoId: target.videoId! });
+        ok = createOwnList({ title: song.title, image: song.image, songs: [song.id] });
       }
-      if (!ok) return setState("full");
+      if (!ok) return setImported("full");
       onClose();
     } catch {
-      setState("error");
+      setImported("error");
     }
   };
 
@@ -215,24 +222,27 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
     if (!file) return;
     try {
       setCover(await squareCover(file));
-      setState("idle");
+      setCreated("idle");
     } catch {
-      setState("badfile");
+      setCreated("badfile");
     }
   };
 
+  const full = `You can have up to ${SAVED_LIMIT} playlists. Remove one first.`;
+
   return (
-    <Modal title="Create playlist" onClose={onClose}>
+    <Modal title="New playlist" onClose={onClose}>
       <form
-        className="flex flex-col gap-4"
+        className="flex flex-col gap-3"
         onSubmit={(e) => {
           e.preventDefault();
-          submit();
+          create();
         }}
       >
+        <h3 className={SECTION}>Create</h3>
         <div className="flex gap-4">
           <label
-            className="group relative flex size-28 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 text-white/35 transition hover:border-white/35 hover:text-white/70 focus-within:ring-2 focus-within:ring-white/35"
+            className="group relative flex size-24 shrink-0 cursor-pointer items-center justify-center overflow-hidden rounded-2xl border border-dashed border-white/15 text-white/35 transition hover:border-white/35 hover:text-white/70 focus-within:ring-2 focus-within:ring-white/35"
             onDragOver={(e) => e.preventDefault()}
             onDrop={(e) => {
               e.preventDefault();
@@ -253,13 +263,13 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
               onChange={(e) => pickCover(e.target.files?.[0])}
             />
           </label>
-          <div className="flex min-w-0 flex-1 flex-col gap-3">
+          <div className="flex min-w-0 flex-1 flex-col gap-2">
             <input
               autoFocus
               value={name}
               onChange={(e) => {
                 setName(e.target.value);
-                setState("idle");
+                setCreated("idle");
               }}
               placeholder="Playlist name"
               aria-label="Playlist name"
@@ -267,54 +277,69 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
               autoComplete="off"
               className={INPUT}
             />
-            <input
-              value={link}
-              onChange={(e) => {
-                setLink(e.target.value);
-                setState("idle");
-              }}
-              placeholder="Song or playlist link (optional)"
-              aria-label="Start from a song or playlist link"
-              spellCheck={false}
-              autoComplete="off"
-              className={INPUT}
-            />
+            <p className="min-h-4 text-xs text-white/40">
+              {created === "error"
+                ? "Give it a name."
+                : created === "full"
+                  ? full
+                  : created === "badfile"
+                    ? "Couldn't read that image."
+                    : songId
+                      ? "Starts with the song you're saving."
+                      : "Your own playlist: rename, reorder and edit it any time."}
+            </p>
+            <button type="submit" className={`${PRIMARY} self-end`}>
+              Create
+            </button>
           </div>
         </div>
-        {isListLink && <SyncToggle synced={synced} onChange={setSynced} />}
-        <p className="min-h-4 text-xs text-white/40">
-          {state === "saving"
-            ? "Creating…"
-            : state === "error"
-              ? link.trim()
+      </form>
+
+      <hr className="my-5 border-white/10" />
+
+      <form
+        className="flex flex-col gap-3"
+        onSubmit={(e) => {
+          e.preventDefault();
+          importLink();
+        }}
+      >
+        <h3 className={SECTION}>Import</h3>
+        <input
+          value={link}
+          onChange={(e) => {
+            setLink(e.target.value);
+            setImported("idle");
+          }}
+          placeholder="Paste a song or playlist link"
+          aria-label="Song or playlist link to import"
+          spellCheck={false}
+          autoComplete="off"
+          className={INPUT}
+        />
+        {target?.listId && <SyncToggle synced={synced} onChange={setSynced} />}
+        <div className="flex items-start justify-between gap-3">
+          <p className="min-h-4 text-xs text-white/40">
+            {imported === "saving"
+              ? "Importing…"
+              : imported === "error"
                 ? "Couldn't use that link."
-                : "Give it a name or a link."
-              : state === "full"
-                ? `You can have up to ${SAVED_LIMIT} playlists. Remove one first.`
-                : state === "badfile"
-                  ? "Couldn't read that image."
-                  : "A song link starts your playlist with it; a playlist link imports that playlist."}
-        </p>
-        <div className="flex justify-end gap-2">
-          <button
-            type="button"
-            onClick={onClose}
-            className="rounded-full px-4 py-2 text-sm font-semibold text-white/60 transition hover:text-white"
-          >
-            Cancel
-          </button>
-          <button
-            type="submit"
-            disabled={state === "saving"}
-            className="rounded-full bg-white px-5 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-white/85 disabled:opacity-50"
-          >
-            Create
+                : imported === "full"
+                  ? full
+                  : "A song link starts a playlist with that song."}
+          </p>
+          <button type="submit" disabled={imported === "saving"} className={`${PRIMARY} shrink-0`}>
+            Import
           </button>
         </div>
       </form>
     </Modal>
   );
 }
+
+const SECTION = "text-xs font-semibold uppercase tracking-[0.16em] text-white/40";
+const PRIMARY =
+  "rounded-full bg-white px-5 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-white/85 disabled:opacity-50";
 
 /** An uploaded image cropped to a 400px square JPEG, small enough for localStorage. */
 async function squareCover(file: File): Promise<string> {
