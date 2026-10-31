@@ -52,6 +52,12 @@ export function PlaylistModals() {
   const [create, setCreate] = useState<{ songId?: string } | null>(null);
   const [pick, setPick] = useState<PickerSong | null>(null);
   const [edit, setEdit] = useState<string | null>(null);
+  const [toast, setToast] = useState<{ id: number; text: string } | null>(null);
+  const flash = (text: string) => {
+    const id = Date.now();
+    setToast({ id, text });
+    setTimeout(() => setToast((t) => (t?.id === id ? null : t)), 2500);
+  };
 
   useEffect(() => {
     const onCreate = (e: Event) => {
@@ -72,8 +78,30 @@ export function PlaylistModals() {
 
   return (
     <AnimatePresence>
+      {toast && (
+        <motion.div
+          key={toast.id}
+          role="status"
+          className="pointer-events-none fixed bottom-24 left-1/2 z-50 max-w-[calc(100vw-2rem)] -translate-x-1/2 truncate rounded-full bg-neutral-900/85 px-4 py-2 text-sm font-semibold text-white/85 shadow-xl ring-1 ring-white/10 backdrop-blur-2xl"
+          initial={{ opacity: 0, y: 8 }}
+          animate={{ opacity: 1, y: 0 }}
+          exit={{ opacity: 0 }}
+        >
+          {toast.text}
+        </motion.div>
+      )}
       {create && <CreateModal key="create" songId={create.songId} onClose={() => setCreate(null)} />}
-      {pick && <SavePicker key={`pick:${pick.id}`} song={pick} onClose={() => setPick(null)} />}
+      {pick && (
+        <SavePicker
+          key={`pick:${pick.id}`}
+          song={pick}
+          onClose={() => setPick(null)}
+          onAdded={(text) => {
+            setPick(null);
+            flash(text);
+          }}
+        />
+      )}
       {edit && <EditModal key={`edit:${edit}`} listId={edit} onClose={() => setEdit(null)} />}
     </AnimatePresence>
   );
@@ -312,7 +340,7 @@ function SyncToggle({ synced, onChange }: { synced: boolean; onChange: (v: boole
 }
 
 /** Saved first, then your playlists, latest created or changed first. A click adds or removes the song. */
-function SavePicker({ song, onClose }: { song: PickerSong; onClose: () => void }) {
+function SavePicker({ song, onClose, onAdded }: { song: PickerSong; onClose: () => void; onAdded: (toast: string) => void }) {
   const saved = useSaved();
   const [busy, setBusy] = useState<string | null>(null);
   const [error, setError] = useState(false);
@@ -331,11 +359,19 @@ function SavePicker({ song, onClose }: { song: PickerSong; onClose: () => void }
         ? { kind: "song" as const, id: song.id, title: song.title, subtitle: song.subtitle ?? "", image: song.image ?? null }
         : await resolveSaved({ videoId: song.id });
       saveItem(item);
+      onAdded(`${item.title} added to Saved`);
     } catch {
       setError(true);
+      setBusy(null);
     }
-    setBusy(null);
   };
+
+  // The toast names the song; look it up when the caller didn't pass it (cached per video).
+  const songTitle = async () =>
+    song.title ??
+    (await fetchVideoInfo(song.id)
+      .then((v) => cleanTitle(v.title, v.channel).title)
+      .catch(() => "Song"));
 
   const toggleList = async (list: SavedItem) => {
     if (list.added?.some((a) => a.id === song.id)) return removeFromList(list.id, song.id);
@@ -343,7 +379,7 @@ function SavePicker({ song, onClose }: { song: PickerSong; onClose: () => void }
     // Own lists keep their order in `added`; a linked list needs its live top track as the neighbour.
     const top = isOwnList(list.id) ? null : ((await listTracks(list.id))[0] ?? null);
     addToList(list, song.id, top);
-    setBusy(null);
+    onAdded(`${await songTitle()} added to ${list.title}`);
   };
 
   return (
