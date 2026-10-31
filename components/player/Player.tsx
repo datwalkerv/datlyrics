@@ -120,7 +120,7 @@ export function Player({
   const playingThisTrack = !!snap.videoId && snap.videoId === snap.loadedId;
   const song = useSongInfo(original, playingOriginal ? snap.rawTitle : "", playingOriginal ? snap.channel : "");
   const artwork = useArtwork(original, song);
-  const lyrics = useLyrics(song, playingThisTrack ? snap.duration : 0);
+  const lyrics = useLyrics(song, playingThisTrack ? snap.duration : 0, snap.videoId);
 
   const playing = snap.status === "playing" || snap.status === "buffering";
   const hasQueue = (snap.playlist?.length ?? 0) > 1;

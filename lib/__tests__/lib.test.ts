@@ -3,7 +3,7 @@ import { parseBackup } from "../backup";
 import { insertNext } from "../queue";
 import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
-import { pickBest } from "../lyrics-source";
+import { pickRedHit } from "../lyrics-source";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseYouTubeUrl } from "../parse-youtube-url";
 import { mergeResults } from "../search-source";
@@ -237,24 +237,18 @@ describe("insertNext", () => {
   });
 });
 
-describe("pickBest", () => {
-  const rec = (id: number | string, duration: number, first: number) => ({
-    id,
-    trackName: "Song",
-    artistName: "Artist",
-    duration,
-    instrumental: false,
-    plainLyrics: "a",
-    syncedLyrics: `[00:${String(first).padStart(2, "0")}.00]a`,
+describe("pickRedHit", () => {
+  const hit = (isrc: string, title: string, duration: number, artist = "Taylor Swift") => ({ isrc, title, artist, duration });
+
+  it("picks the same song by name, closest length first", () => {
+    const hits = [hit("USCJY1831958", "Shake It Off (Commentary)", 60), hit("USUG12306677", "Shake It Off (Taylor's Version)", 219.2), hit("USCJY1431349", "Shake It Off", 219.2)];
+    expect(pickRedHit(hits, "Taylor Swift", "Shake It Off", 219)?.isrc).toBe("USUG12306677");
+    expect(pickRedHit(hits, "Taylor Swift", "Shake It Off", 61)?.isrc).toBe("USCJY1831958");
   });
 
-  it("prefers a datlrc record timed for this upload over LRCLIB ones", () => {
-    // Three same-length LRCLIB uploads agree with each other, which earns them a trust bonus.
-    const lrclib = [rec(1, 200, 10), rec(2, 200, 10), rec(3, 201, 10)];
-    expect(pickBest([...lrclib, rec("lrc_a", 200, 12)], "Song", 200)?.id).toBe("lrc_a");
-  });
-
-  it("doesn't let a datlrc record for a different-length upload win", () => {
-    expect(pickBest([rec(1, 200, 10), rec("lrc_a", 215, 12)], "Song", 200)?.id).toBe(1);
+  it("ignores other songs, other artists and malformed ISRCs", () => {
+    expect(pickRedHit([hit("USCJY1431349", "Blank Space", 231)], "Taylor Swift", "Shake It Off", 219)).toBeNull();
+    expect(pickRedHit([hit("USCJY1431349", "Shake It Off", 219, "Someone Else")], "Taylor Swift", "Shake It Off", 219)).toBeNull();
+    expect(pickRedHit([hit("../etc/passwd", "Shake It Off", 219)], "Taylor Swift", "Shake It Off", 219)).toBeNull();
   });
 });

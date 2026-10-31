@@ -56,7 +56,7 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 - **Animation**: [Motion](https://motion.dev/)
 - **Type Safety**: [TypeScript](https://www.typescriptlang.org/)
 - **Playback**: [YouTube IFrame Player API](https://developers.google.com/youtube/iframe_api_reference)
-- **Lyrics**: [LRCLIB](https://lrclib.net/)
+- **Lyrics**: [LRCLIB](https://lrclib.net/), then [lrc.red](https://lrc.red), then [datlrc](https://github.com/datwalkerv/datlrc)
 - **Album Art**: [iTunes Search API](https://performance-partners.apple.com/search-api)
 - **Testing**: [Vitest](https://vitest.dev/)
 - **Fonts**: [Geist](https://vercel.com/font), self-hosted
@@ -69,7 +69,8 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 - Videos the owner doesn't allow outside YouTube are skipped in playlists.
 
 ### Lyrics
-- Lyrics come from LRCLIB, matched by artist, title and the length of the upload that's playing.
+- Lyrics come from LRCLIB, matched by artist, title and the length of the upload that's playing. When LRCLIB has no synced lyrics, lrc.red is asked next, then datlrc.
+- Songs nobody has synced are sent to datlrc's "Needs lyrics" list, so someone can sync them. To use datlrc, set `LYRICS_API=https://<datlrc host>/api` and `LYRICS_API_KEY`; set `CONTACT_EMAIL` too, which lrc.red's terms ask for.
 - A music video often has a different timeline from the album audio. LRCLIB sometimes has the album timing filed under the video's length, so timings that clearly belong to a different-length upload are ranked down.
 - To switch between the song and the video, the two lyric files are aligned line by line. That keeps playback on the right line, even on hooks that repeat dozens of times.
 
@@ -81,7 +82,7 @@ A TV-style synced lyrics player for YouTube songs and playlists, made for the bi
 
 - datlyrics has **no accounts, no database, no analytics and no cookies**.
 - The only things saved are your saved songs and playlists, plus your song / video and background effect choices, all in your own browser's local storage.
-- Search terms, song titles and video IDs go through datlyrics' server to YouTube, LRCLIB and iTunes, so your browser doesn't contact those services itself. Responses are cached, and nothing is logged or stored about you.
+- Search terms, song titles and video IDs go through datlyrics' server to YouTube, LRCLIB, lrc.red, datlrc and iTunes, so your browser doesn't contact those services itself. Responses are cached, and nothing is logged or stored about you.
 - Playback happens in YouTube's embedded player, so YouTube's own privacy policy applies to what you watch.
 
 ## 💛 Donate

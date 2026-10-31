@@ -44,8 +44,9 @@ export function fetchArtwork({ artist, title }: SongInfo) {
   );
 }
 
-export function fetchLyrics({ artist, title }: SongInfo, duration: number) {
-  const q = new URLSearchParams({ artist, title, duration: String(Math.round(duration)) });
+/** `videoId` is the upload playing; it goes along so a song nobody has synced can be sent to datlrc. */
+export function fetchLyrics({ artist, title }: SongInfo, duration: number, videoId?: string) {
+  const q = new URLSearchParams({ artist, title, duration: String(Math.round(duration)), ...(videoId && { v: videoId }) });
   const url = `/api/lyrics?${q}`;
   // LRCLIB occasionally times out; one delayed retry covers most blips.
   return cached(`lyrics:${q}`, () =>
@@ -116,7 +117,7 @@ export function useArtwork(videoId: string | null, song: SongInfo | null): strin
 
 export type LyricsState = { status: "loading" } | { status: "error" } | ({ status: "ready" } & LyricsResult);
 
-export function useLyrics(song: SongInfo | null, duration: number): LyricsState {
+export function useLyrics(song: SongInfo | null, duration: number, videoId?: string | null): LyricsState {
   const [state, setState] = useState<{ key: string; value: LyricsState } | null>(null);
   // Wait for the real duration: it's the strongest signal for picking the right LRC.
   const key = song && duration > 0 ? `${song.artist}|${song.title}|${Math.round(duration)}` : null;
@@ -124,7 +125,7 @@ export function useLyrics(song: SongInfo | null, duration: number): LyricsState 
   useEffect(() => {
     if (!key || !song) return;
     let alive = true;
-    fetchLyrics(song, duration)
+    fetchLyrics(song, duration, videoId ?? undefined)
       .then((r) => alive && setState({ key, value: { status: "ready", ...r } }))
       .catch(() => alive && setState({ key, value: { status: "error" } }));
     return () => {

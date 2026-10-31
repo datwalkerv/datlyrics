@@ -18,6 +18,11 @@ const norm = (s: string) =>
 
 /** Square album cover from the iTunes Search API, or null if nothing plausible matched. */
 export async function findArtwork(artist: string, title: string): Promise<string | null> {
+  return (await findItunesSong(artist, title))?.artwork ?? null;
+}
+
+/** The iTunes release of a song: its square cover and album name. */
+export async function findItunesSong(artist: string, title: string): Promise<{ artwork: string; album: string | null } | null> {
   "use cache";
   cacheLife("weeks");
 
@@ -54,7 +59,8 @@ export async function findArtwork(artist: string, title: string): Promise<string
     }
   }
 
-  return match?.artworkUrl100?.replace(/\/\d+x\d+bb\.(jpg|png)$/, "/1000x1000bb.$1") ?? null;
+  const artwork = match?.artworkUrl100?.replace(/\/\d+x\d+bb\.(jpg|png)$/, "/1000x1000bb.$1");
+  return artwork ? { artwork, album: match?.collectionName?.replace(/ - (Single|EP)$/, "") || null } : null;
 }
 
 /** Square cover of an album, EP or single from the iTunes Search API, or null if none matched. */

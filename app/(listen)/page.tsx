@@ -214,6 +214,10 @@ export default function Home() {
           <a href="https://lrclib.net" target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-white/60 hover:underline">
             LRCLIB
           </a>{" "}
+          and{" "}
+          <a href="https://lrc.red" target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-white/60 hover:underline">
+            lrc.red
+          </a>{" "}
           · Playback by YouTube ·{" "}
           <a href={GITHUB_URL} target="_blank" rel="noreferrer" className="underline-offset-4 hover:text-white/60 hover:underline">
             Source on GitHub
