@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { usePathname, useRouter } from "next/navigation";
+import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
 import { recordPlay } from "@/lib/history";
@@ -128,16 +128,23 @@ export function Player({
   const nextId = snap.playlist?.[snap.index + 1] ?? null;
   const trackKey = `${snap.index}:${original ?? "none"}`;
 
-  // On /play and /home the tab names the song while it plays; otherwise the page's own title stays.
-  const pathname = usePathname();
-  const tabTitle = playing && song?.title && (pathname === "/play" || pathname === "/home") ? `${song.title} - datlyrics` : null;
+  // While a song plays the tab names it on every page; otherwise the page's own title stays.
+  const tabTitle = playing && song?.title ? `${song.title} - datlyrics` : null;
   useEffect(() => {
     if (!tabTitle) return;
-    const before = document.title;
-    document.title = tabTitle;
+    let pageTitle = document.title;
+    // Pages set their own title on navigation (some a moment later, once their metadata streams in): remember it and put ours back.
+    const apply = () => {
+      if (document.title === tabTitle) return;
+      pageTitle = document.title;
+      document.title = tabTitle;
+    };
+    apply();
+    const observer = new MutationObserver(apply);
+    observer.observe(document.head, { subtree: true, childList: true, characterData: true });
     return () => {
-      // Navigating away, the new page has already set its title; only undo ours.
-      if (document.title === tabTitle) document.title = before;
+      observer.disconnect();
+      if (document.title === tabTitle) document.title = pageTitle;
     };
   }, [tabTitle]);
 
