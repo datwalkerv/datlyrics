@@ -5,7 +5,8 @@ import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from ".
 import { cleanTitle } from "../clean-title";
 import { pickRedHit } from "../lyrics-source";
 import { activeLineIndex, parseLrc } from "../lrc";
-import { parseYouTubeUrl } from "../parse-youtube-url";
+import { parseImportUrl, parseYouTubeUrl } from "../parse-youtube-url";
+import { parseApple, parseSpotify, pickMatch, toSeconds } from "../import-source";
 import { mergeResults } from "../search-source";
 import { parseRadio } from "../video-source";
 
@@ -262,5 +263,42 @@ describe("mergeAdded", () => {
   });
   it("is just the added songs for an own list", () => {
     expect(mergeAdded([], [{ id: "y" }, { id: "x" }])).toEqual(["y", "x"]);
+  });
+});
+
+describe("parseImportUrl", () => {
+  it.each([
+    ["https://open.spotify.com/playlist/37i9dQZF1DXcBWIGoYBM5M?si=x", "https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M"],
+    ["open.spotify.com/intl-de/playlist/37i9dQZF1DXcBWIGoYBM5M", "https://open.spotify.com/embed/playlist/37i9dQZF1DXcBWIGoYBM5M"],
+    ["https://music.apple.com/us/playlist/todays-hits/pl.f4d106fed2bd41149aaacabb233eb5eb", "https://music.apple.com/us/playlist/todays-hits/pl.f4d106fed2bd41149aaacabb233eb5eb"],
+  ])("%s", (input, url) => expect(parseImportUrl(input)?.url).toBe(url));
+  it.each(["https://open.spotify.com/track/7bxaFZ1O3cHkgLKMsdC3xR", "https://evil.com/playlist/37i9dQZF1DXcBWIGoYBM5M", "hello"])(
+    "rejects %s",
+    (input) => expect(parseImportUrl(input)).toBeNull(),
+  );
+});
+
+describe("import matching", () => {
+  it("parses durations and picks the first song within 5s", () => {
+    expect(toSeconds("3:40")).toBe(220);
+    expect(toSeconds("1:02:03")).toBe(3723);
+    const results = [
+      { id: "long", duration: "4:10" },
+      { id: "close", duration: "3:44" },
+      { id: "exact", duration: "3:40" },
+    ];
+    expect(pickMatch(results, 220_400)).toBe("close");
+    expect(pickMatch(results, 100_000)).toBeNull();
+  });
+
+  it("reads Spotify embed and Apple Music page data", () => {
+    const sp = `<script id="__NEXT_DATA__" type="application/json">${JSON.stringify({
+      props: { pageProps: { state: { data: { entity: { name: "Mix", coverArt: { sources: [{ url: "c.jpg" }] }, trackList: [{ title: "Loser", subtitle: "Tame Impala", duration: 223069 }] } } } } },
+    })}</script>`;
+    expect(parseSpotify(sp)).toEqual({ title: "Mix", image: "c.jpg", tracks: [{ title: "Loser", artist: "Tame Impala", ms: 223069 }] });
+
+    const am = `<meta property="og:title" content="Today’s Hits on Apple Music"><meta property="og:image" content="a.jpg">
+<script type="application/json" id="serialized-server-data">${JSON.stringify([{ shelf: { items: [{ title: "Housewife", artistName: "Tate McRae", duration: 208810 }] } }])}</script>`;
+    expect(parseApple(am)).toEqual({ title: "Today’s Hits", image: "a.jpg", tracks: [{ title: "Housewife", artist: "Tate McRae", ms: 208810 }] });
   });
 });

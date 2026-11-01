@@ -46,3 +46,21 @@ export function targetToQuery(t: YouTubeTarget): string {
   if (t.videoId) p.set("v", t.videoId);
   return p.toString();
 }
+
+export type ImportTarget = { source: "spotify" | "apple"; url: string };
+
+/** A Spotify or Apple Music playlist link, imported by matching each track on YouTube Music. */
+export function parseImportUrl(input: string): ImportTarget | null {
+  let url: URL;
+  try {
+    url = new URL(/^https?:\/\//i.test(input.trim()) ? input.trim() : `https://${input.trim()}`);
+  } catch {
+    return null;
+  }
+  const spotify = url.pathname.match(/^(?:\/intl-[a-z-]+)?\/(?:embed\/)?playlist\/([A-Za-z0-9]{22})/);
+  if (url.hostname === "open.spotify.com" && spotify)
+    return { source: "spotify", url: `https://open.spotify.com/embed/playlist/${spotify[1]}` };
+  const apple = url.pathname.match(/^\/[a-z]{2}\/playlist\/(?:[^/]+\/)?pl\.[\w.-]+$/);
+  if (url.hostname === "music.apple.com" && apple) return { source: "apple", url: `https://music.apple.com${url.pathname}` };
+  return null;
+}

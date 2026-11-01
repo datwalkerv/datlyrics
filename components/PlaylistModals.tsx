@@ -4,7 +4,7 @@ import { AnimatePresence, Reorder, motion, useDragControls } from "motion/react"
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { fetchVideoInfo } from "@/components/player/useTrackMeta";
 import { cleanTitle } from "@/lib/clean-title";
-import { parseYouTubeUrl } from "@/lib/parse-youtube-url";
+import { parseImportUrl, parseYouTubeUrl } from "@/lib/parse-youtube-url";
 import {
   SAVED_LIMIT,
   addToList,
@@ -191,6 +191,7 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
   const [created, setCreated] = useState<Status>("idle");
   const [imported, setImported] = useState<Status>("idle");
   const target = parseYouTubeUrl(link.trim());
+  const external = target ? null : parseImportUrl(link);
 
   const create = () => {
     if (!name.trim()) return setCreated("error");
@@ -206,21 +207,29 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
   };
 
   const importLink = async () => {
-    if (!target) return setImported("error");
+    if (!target && !external) return setImported("error");
     setImported("saving");
     try {
       let ok: boolean;
-      if (target.listId) {
-        const list = await resolveSaved({ listId: target.listId });
+      if (external) {
+        // Spotify / Apple Music: each track matched to a YouTube Music song, copied into your own playlist.
+        const res = await fetch(`/api/import?url=${encodeURIComponent(link.trim())}`);
+        if (!res.ok) throw new Error("import failed");
+        const list = (await res.json()) as { title: string; image: string | null; ids: string[]; total: number; missing: string[] };
+        if (!list.ids.length) throw new Error("no matches");
+        ok = createOwnList({ title: list.title, image: list.image, songs: list.ids });
+        if (ok && list.missing.length) showToast(`Imported ${list.total - list.missing.length} of ${list.total} songs, ${list.missing.length} not found`);
+      } else if (target!.listId) {
+        const list = await resolveSaved({ listId: target!.listId });
         if (synced) ok = saveItem(list);
         else {
           // Not synced: copy today's tracks into your own playlist, to edit freely.
-          const songs = await listTracks(target.listId);
+          const songs = await listTracks(target!.listId);
           if (!songs.length) throw new Error("no tracks");
           ok = createOwnList({ title: list.title, image: list.image, songs });
         }
       } else {
-        const song = await resolveSaved({ videoId: target.videoId! });
+        const song = await resolveSaved({ videoId: target!.videoId! });
         ok = createOwnList({
           title: song.title,
           image: song.image,
@@ -327,7 +336,7 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
             setLink(e.target.value);
             setImported("idle");
           }}
-          placeholder="Paste a song or playlist link"
+          placeholder="Paste a YouTube, Spotify or Apple Music link"
           aria-label="Song or playlist link to import"
           spellCheck={false}
           autoComplete="off"
@@ -337,12 +346,14 @@ function CreateModal({ songId, onClose }: { songId?: string; onClose: () => void
         <div className="flex items-start justify-between gap-3">
           <p className="min-h-4 text-xs text-white/40">
             {imported === "saving"
-              ? "Importing…"
+              ? external
+                ? "Finding every song on YouTube Music…"
+                : "Importing…"
               : imported === "error"
                 ? "Couldn't use that link."
                 : imported === "full"
                   ? full
-                  : "A song link starts a playlist with that song."}
+                  : "A song link starts a playlist with that song. Spotify and Apple Music playlists are matched song by song."}
           </p>
           <button type="submit" disabled={imported === "saving"} className={`${PRIMARY} shrink-0`}>
             Import
