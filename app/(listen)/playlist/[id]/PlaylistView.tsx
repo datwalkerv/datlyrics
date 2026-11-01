@@ -2,13 +2,15 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
+import { AnimatePresence } from "motion/react";
 import { useEffect, useState, useSyncExternalStore } from "react";
+import { CardMenu, menuAt, type CardMenuState } from "@/app/(listen)/home/CardMenu";
 import { EMPTY_COVER, blockEmpty } from "@/components/PlaylistModals";
 import { CoverImage } from "@/components/player/CoverImage";
 import { playHere } from "@/components/player/remote";
 import { fetchVideoInfo } from "@/components/player/useTrackMeta";
 import { cleanTitle } from "@/lib/clean-title";
-import { SAVED_LIST_ID, isLocalList, mergeAdded, useSaved } from "@/lib/saved";
+import { SAVED_LIST_ID, isLocalList, mergeAdded, removeFromList, removeItem, useSaved } from "@/lib/saved";
 
 type Header = { title: string; subtitle: string; image: string | null; badge?: string };
 
@@ -18,9 +20,10 @@ export function PlaylistView() {
   const saved = useSaved();
   const item = saved.find((x) => x.kind === "playlist" && x.id === id);
   const local = isLocalList(id);
-  const [remote, setRemote] = useState<{ header: Header | null; ids: string[] | null; failed: boolean }>({
+  const [remote, setRemote] = useState<{ header: Header | null; ids: string[] | null; durations: Record<string, string>; failed: boolean }>({
     header: null,
     ids: null,
+    durations: {},
     failed: false,
   });
 
@@ -30,13 +33,14 @@ export function PlaylistView() {
     const json = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(url))));
     Promise.all([
       json(`/api/playlist/${id}`).catch(() => null) as Promise<{ title: string; channel: string; thumbnail: string | null; kind: string | null } | null>,
-      json(`/api/playlist/${id}/tracks`).then((d: { ids: string[] }) => d.ids).catch(() => null),
-    ]).then(([info, ids]) => {
+      json(`/api/playlist/${id}/tracks`).catch(() => null) as Promise<{ ids: string[]; durations?: Record<string, string> } | null>,
+    ]).then(([info, tracks]) => {
       if (!alive) return;
       setRemote({
         header: info && { title: info.title, subtitle: info.channel, image: info.thumbnail, badge: info.kind ?? undefined },
-        ids,
-        failed: !info && !ids,
+        ids: tracks?.ids ?? null,
+        durations: tracks?.durations ?? {},
+        failed: !info && !tracks,
       });
     });
     return () => {
@@ -54,6 +58,11 @@ export function PlaylistView() {
   // localStorage is only read after hydration; until then an own list would look missing.
   const hydrated = useSyncExternalStore(noop, () => true, () => false);
   const missing = (hydrated && local && id !== SAVED_LIST_ID && !item) || remote.failed;
+
+  const [menu, setMenu] = useState<CardMenuState | null>(null);
+  // Songs you put here (every song of a local list, the added ones of a synced list) can be removed; the synced tracks can't.
+  const addedIds = new Set(local ? ids : item?.added?.map((a) => a.id));
+  const remove = (songId: string) => (id === SAVED_LIST_ID ? removeItem("song", songId) : removeFromList(id, songId));
 
   const play = (videoId?: string) => {
     if (blockEmpty(id)) return;
@@ -99,7 +108,27 @@ export function PlaylistView() {
               ids.length ? (
                 <ol>
                   {ids.map((songId, i) => (
-                    <SongRow key={songId} id={songId} index={i} onPlay={() => play(songId)} />
+                    <SongRow
+                      key={songId}
+                      id={songId}
+                      index={i}
+                      duration={remote.durations[songId]}
+                      onPlay={() => play(songId)}
+                      {...(addedIds.has(songId) && {
+                        onRemove: () => remove(songId),
+                        onMore: (e: React.MouseEvent, info: { title: string; artist: string } | null) =>
+                          setMenu(
+                            menuAt(e, {
+                              kind: "song",
+                              id: songId,
+                              title: info?.title ?? "",
+                              subtitle: info?.artist ?? "",
+                              image: `https://i.ytimg.com/vi/${songId}/mqdefault.jpg`,
+                              savedAt: 0,
+                            }),
+                          ),
+                      })}
+                    />
                   ))}
                 </ol>
               ) : (
@@ -115,6 +144,7 @@ export function PlaylistView() {
           </>
         )}
       </div>
+      <AnimatePresence>{menu && <CardMenu key={`${menu.item.id}:${menu.x}:${menu.y}`} menu={menu} onClose={() => setMenu(null)} />}</AnimatePresence>
     </main>
   );
 }
@@ -122,8 +152,25 @@ export function PlaylistView() {
 const noop = () => () => {};
 
 // shortcut: one title lookup per row (cached), like the edit modal; fine for ~100 songs, batch it if lists get much longer.
-function SongRow({ id, index, onPlay }: { id: string; index: number; onPlay: () => void }) {
-  const [info, setInfo] = useState<{ title: string; artist: string } | null>(null);
+type Info = { title: string; artist: string };
+
+function SongRow({
+  id,
+  index,
+  duration,
+  onPlay,
+  onRemove,
+  onMore,
+}: {
+  id: string;
+  index: number;
+  /** Only known for a synced list's own tracks (it comes with them); other songs show none rather than cost a lookup each. */
+  duration?: string;
+  onPlay: () => void;
+  onRemove?: () => void;
+  onMore?: (e: React.MouseEvent, info: Info | null) => void;
+}) {
+  const [info, setInfo] = useState<Info | null>(null);
   useEffect(() => {
     let alive = true;
     fetchVideoInfo(id)
@@ -135,7 +182,7 @@ function SongRow({ id, index, onPlay }: { id: string; index: number; onPlay: () 
   }, [id]);
 
   return (
-    <li>
+    <li className="group/row relative">
       <button onClick={onPlay} className="group flex w-full items-center gap-4 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
         <span className="w-6 text-right text-sm font-medium tabular-nums text-white/35">{index + 1}</span>
         <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-white/5">
@@ -149,8 +196,49 @@ function SongRow({ id, index, onPlay }: { id: string; index: number; onPlay: () 
           <p className="truncate font-semibold">{info?.title ?? "…"}</p>
           <p className="truncate text-sm text-white/45">{info?.artist ?? ""}</p>
         </div>
+        {duration && <span className="shrink-0 text-sm tabular-nums text-white/40">{duration}</span>}
+        {/* Room for the hover actions, so a long title doesn't run under them. */}
+        {onRemove && <span className="w-20 shrink-0" />}
       </button>
+      {onRemove && onMore && (
+        <div className="absolute inset-y-0 right-3 flex items-center gap-1 opacity-0 transition group-hover/row:opacity-100 focus-within:opacity-100">
+          <RowAction label={`More for ${info?.title ?? "song"}`} onClick={(e) => onMore(e, info)} onContextMenu={(e) => onMore(e, info)}>
+            <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+            <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+            <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+          </RowAction>
+          <RowAction label={`Remove ${info?.title ?? "song"} from this playlist`} onClick={onRemove}>
+            <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
+          </RowAction>
+        </div>
+      )}
     </li>
+  );
+}
+
+function RowAction({
+  label,
+  onClick,
+  onContextMenu,
+  children,
+}: {
+  label: string;
+  onClick: (e: React.MouseEvent) => void;
+  onContextMenu?: (e: React.MouseEvent) => void;
+  children: React.ReactNode;
+}) {
+  return (
+    <button
+      onClick={onClick}
+      onContextMenu={onContextMenu}
+      aria-label={label}
+      title={label}
+      className="flex size-9 items-center justify-center rounded-full text-white/55 transition hover:bg-white/10 hover:text-white"
+    >
+      <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+        {children}
+      </svg>
+    </button>
   );
 }
 

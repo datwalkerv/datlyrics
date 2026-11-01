@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseBackup } from "../backup";
 import { insertNext, mergeAdded } from "../queue";
-import { mergeReleases, parseArtist, parsePlaylistArtists, rankArtists } from "../artist-source";
+import { mergeReleases, parseArtist, parsePlaylistArtists, parsePlaylistDurations, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { pickRedHit } from "../lyrics-source";
 import { activeLineIndex, parseLrc } from "../lrc";
@@ -300,5 +300,17 @@ describe("import matching", () => {
     const am = `<meta property="og:title" content="Today’s Hits on Apple Music"><meta property="og:image" content="a.jpg">
 <script type="application/json" id="serialized-server-data">${JSON.stringify([{ shelf: { items: [{ title: "Housewife", artistName: "Tate McRae", duration: 208810 }] } }])}</script>`;
     expect(parseApple(am)).toEqual({ title: "Today’s Hits", image: "a.jpg", tracks: [{ title: "Housewife", artist: "Tate McRae", ms: 208810 }] });
+  });
+});
+
+describe("parsePlaylistDurations", () => {
+  it("reads each row's fixed column, skipping rows without a length", () => {
+    const row = (videoId: string, d?: string) => ({
+      musicResponsiveListItemRenderer: {
+        playlistItemData: { videoId },
+        ...(d && { fixedColumns: [{ musicResponsiveListItemFixedColumnRenderer: { text: { runs: [{ text: d }] } } }] }),
+      },
+    });
+    expect(parsePlaylistDurations({ contents: [row("a", "4:59"), row("b"), row("c", "1:02:03"), row("d", "LIVE")] })).toEqual({ a: "4:59", c: "1:02:03" });
   });
 });
