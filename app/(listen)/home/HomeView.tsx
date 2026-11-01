@@ -40,8 +40,8 @@ export function HomeView() {
   const closeMenu = useCallback(() => setMenu(null), []);
   const openMenu = (e: React.MouseEvent, item: SavedItem) => setMenu(menuAt(e, item));
 
-  const card = (item: SavedItem) => (
-    <SavedCard item={item} className={CARD} pinned onPlay={() => play(item)} onContextMenu={(e) => openMenu(e, item)} />
+  const card = (item: SavedItem, artist?: string) => (
+    <SavedCard item={item} artist={artist} className={CARD} pinned onPlay={() => play(item)} onContextMenu={(e) => openMenu(e, item)} />
   );
 
   return (
@@ -96,7 +96,7 @@ export function HomeView() {
             <Row>
               {recommended
                 ? recommended.map((t) => (
-                    <Animated key={t.id}>{card(songItem(t.id, t.title, t.artist, t.image))}</Animated>
+                    <Animated key={t.id}>{card(songItem(t.id, t.title, t.artist, t.image), t.artist)}</Animated>
                   ))
                 : <Skeletons />}
             </Row>
@@ -107,7 +107,7 @@ export function HomeView() {
           <Section title="Recently played">
             <Row>
               {recent.map((h) => (
-                <Animated key={h.id}>{card(songItem(h.id, h.title, h.artist, h.image))}</Animated>
+                <Animated key={h.id}>{card(songItem(h.id, h.title, h.artist, h.image), h.artist)}</Animated>
               ))}
             </Row>
           </Section>
@@ -130,7 +130,7 @@ export function HomeView() {
                       <Row>
                         {releases
                           ? releases[kind].map((r) => (
-                              <Animated key={r.listId}>{card(releaseItem(r))}</Animated>
+                              <Animated key={r.listId}>{card(releaseItem(r), r.artist)}</Animated>
                             ))
                           : <Skeletons />}
                       </Row>

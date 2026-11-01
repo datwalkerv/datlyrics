@@ -9,7 +9,8 @@ import { EMPTY_COVER, blockEmpty } from "@/components/PlaylistModals";
 import { CoverImage } from "@/components/player/CoverImage";
 import { playHere } from "@/components/player/remote";
 import { fetchVideoInfo } from "@/components/player/useTrackMeta";
-import { cleanTitle, withoutFeat } from "@/lib/clean-title";
+import { ArtistLink } from "@/components/ArtistLink";
+import { cleanTitle } from "@/lib/clean-title";
 import { SAVED_LIST_ID, isLocalList, mergeAdded, removeFromList, removeItem, useSaved } from "@/lib/saved";
 
 type Header = { title: string; subtitle: string; image: string | null; badge?: string };
@@ -216,15 +217,6 @@ function SongRow({
         </div>
       )}
     </li>
-  );
-}
-
-/** Like the player's artist line: opens the artist's page (a "feat." credit goes to the main artist). */
-function ArtistLink({ name, className = "" }: { name: string; className?: string }) {
-  return (
-    <Link href={`/artist/${encodeURIComponent(withoutFeat(name))}`} className={`transition hover:text-white ${className}`}>
-      {name}
-    </Link>
   );
 }
 

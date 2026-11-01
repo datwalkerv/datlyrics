@@ -4,6 +4,7 @@ import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
+import { ArtistLink } from "@/components/ArtistLink";
 import { CoverImage } from "@/components/player/CoverImage";
 import { EMPTY_COVER, blockEmpty, openCreatePlaylist } from "@/components/PlaylistModals";
 import { playHere } from "@/components/player/remote";
@@ -89,12 +90,15 @@ export function SavedShelf({
 export function SavedCard({
   item,
   pinned = false,
+  artist,
   className = "w-28",
   onPlay,
   onContextMenu,
 }: {
   item: SavedItem;
   pinned?: boolean;
+  /** The artist the subtitle starts with, shown as a link to their page. */
+  artist?: string;
   className?: string;
   onPlay: () => void;
   onContextMenu?: (e: React.MouseEvent) => void;
@@ -136,7 +140,16 @@ export function SavedCard({
           {item.title}
         </button>
       )}
-      <p className="truncate text-xs text-white/45">{item.subtitle}</p>
+      <p className="truncate text-xs text-white/45">
+        {artist && item.subtitle.startsWith(artist) ? (
+          <>
+            <ArtistLink name={artist} />
+            {item.subtitle.slice(artist.length)}
+          </>
+        ) : (
+          item.subtitle
+        )}
+      </p>
       {!pinned && (
         <button
           onClick={() => removeItem(item.kind, item.id)}
