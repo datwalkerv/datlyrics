@@ -1,6 +1,7 @@
 "use client";
 
 import { AnimatePresence, motion } from "motion/react";
+import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect } from "react";
 import { CoverImage } from "@/components/player/CoverImage";
@@ -100,7 +101,7 @@ export function SavedCard({
 }) {
   return (
     <div className={`group relative shrink-0 text-left ${className}`} onContextMenu={onContextMenu}>
-      <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`}>
+      <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`} aria-label={`Play ${item.title}`}>
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
           {!item.image && item.kind === "playlist" && <div className={`h-full w-full ${EMPTY_COVER}`} />}
           {item.image && (
@@ -124,9 +125,18 @@ export function SavedCard({
             </span>
           )}
         </div>
-        <p className="mt-2 truncate text-sm font-semibold text-white/90">{item.title}</p>
-        <p className="truncate text-xs text-white/45">{item.subtitle}</p>
       </button>
+      {/* The cover plays; a list's name opens its page with the songs. */}
+      {item.kind === "playlist" ? (
+        <Link href={`/playlist/${item.id}`} className="mt-2 block truncate text-sm font-semibold text-white/90 hover:underline" title={item.title}>
+          {item.title}
+        </Link>
+      ) : (
+        <button onClick={onPlay} className="mt-2 block w-full truncate text-left text-sm font-semibold text-white/90">
+          {item.title}
+        </button>
+      )}
+      <p className="truncate text-xs text-white/45">{item.subtitle}</p>
       {!pinned && (
         <button
           onClick={() => removeItem(item.kind, item.id)}

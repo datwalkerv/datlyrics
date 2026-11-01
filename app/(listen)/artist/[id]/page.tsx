@@ -119,16 +119,18 @@ function Releases({ title, artist, items }: { title: string; artist: string; ite
       <SectionTitle>{title}</SectionTitle>
       <div className="mt-5 grid grid-cols-2 gap-x-5 gap-y-7 sm:grid-cols-3 lg:grid-cols-5">
         {items.map((r) => (
-          <Link key={r.listId} href={`/play?list=${r.listId}`} className="group" title={`Play ${r.title}`}>
-            <div className="relative aspect-square overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
+          <div key={r.listId} className="group">
+            <Link href={`/play?list=${r.listId}`} title={`Play ${r.title}`} aria-label={`Play ${r.title}`} className="relative block aspect-square overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
               <Cover src={r.image} artist={artist} album={r.title} className="h-full w-full object-cover" />
               <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
                 <PlayIcon className="size-10" />
               </div>
-            </div>
-            <p className="mt-2.5 truncate font-semibold">{r.title}</p>
+            </Link>
+            <Link href={`/playlist/${r.listId}`} className="mt-2.5 block truncate font-semibold hover:underline" title={r.title}>
+              {r.title}
+            </Link>
             <p className="text-sm text-white/45">{r.year}</p>
-          </Link>
+          </div>
         ))}
       </div>
     </section>
