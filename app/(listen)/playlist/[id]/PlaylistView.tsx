@@ -9,7 +9,7 @@ import { EMPTY_COVER, blockEmpty } from "@/components/PlaylistModals";
 import { CoverImage } from "@/components/player/CoverImage";
 import { playHere } from "@/components/player/remote";
 import { fetchVideoInfo } from "@/components/player/useTrackMeta";
-import { cleanTitle } from "@/lib/clean-title";
+import { cleanTitle, withoutFeat } from "@/lib/clean-title";
 import { SAVED_LIST_ID, isLocalList, mergeAdded, removeFromList, removeItem, useSaved } from "@/lib/saved";
 
 type Header = { title: string; subtitle: string; image: string | null; badge?: string };
@@ -90,7 +90,8 @@ export function PlaylistView() {
                   {header?.title ?? <span className="inline-block h-[0.9em] w-64 animate-pulse rounded-xl bg-white/[0.06]" />}
                 </h1>
                 <p className="mt-3 text-white/50">
-                  {header?.subtitle}
+                  {/* An album's subtitle is its artist; a playlist's is its owner or "Your playlist". */}
+                  {header?.subtitle && header.badge && header.badge !== "Playlist" ? <ArtistLink name={header.subtitle} /> : header?.subtitle}
                   {ids && ` · ${ids.length} song${ids.length === 1 ? "" : "s"}`}
                 </p>
                 <button
@@ -182,24 +183,26 @@ function SongRow({
   }, [id]);
 
   return (
-    <li className="group/row relative">
-      <button onClick={onPlay} className="group flex w-full items-center gap-4 rounded-xl px-3 py-2.5 text-left transition hover:bg-white/[0.06]">
+    <li className="group/row relative rounded-xl transition hover:bg-white/[0.06]">
+      {/* The whole row plays; it's a layer under the content so the artist can be its own link. */}
+      <button onClick={onPlay} aria-label={`Play ${info?.title ?? "song"}`} className="absolute inset-0 rounded-xl" />
+      <div className="pointer-events-none relative flex w-full items-center gap-4 px-3 py-2.5">
         <span className="w-6 text-right text-sm font-medium tabular-nums text-white/35">{index + 1}</span>
         <div className="relative size-12 shrink-0 overflow-hidden rounded-lg bg-white/5">
           {/* eslint-disable-next-line @next/next/no-img-element */}
           <img src={`https://i.ytimg.com/vi/${id}/mqdefault.jpg`} alt="" loading="lazy" className="h-full w-full object-cover" />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover:opacity-100">
+          <div className="absolute inset-0 flex items-center justify-center bg-black/40 opacity-0 transition group-hover/row:opacity-100">
             <PlayIcon className="size-5" />
           </div>
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{info?.title ?? "…"}</p>
-          <p className="truncate text-sm text-white/45">{info?.artist ?? ""}</p>
+          <p className="truncate text-sm text-white/45">{info?.artist && <ArtistLink name={info.artist} className="pointer-events-auto" />}</p>
         </div>
         {duration && <span className="shrink-0 text-sm tabular-nums text-white/40">{duration}</span>}
         {/* Room for the hover actions, so a long title doesn't run under them. */}
         {onRemove && <span className="w-20 shrink-0" />}
-      </button>
+      </div>
       {onRemove && onMore && (
         <div className="absolute inset-y-0 right-3 flex items-center gap-1 opacity-0 transition group-hover/row:opacity-100 focus-within:opacity-100">
           <RowAction label={`More for ${info?.title ?? "song"}`} onClick={(e) => onMore(e, info)} onContextMenu={(e) => onMore(e, info)}>
@@ -213,6 +216,15 @@ function SongRow({
         </div>
       )}
     </li>
+  );
+}
+
+/** Like the player's artist line: opens the artist's page (a "feat." credit goes to the main artist). */
+function ArtistLink({ name, className = "" }: { name: string; className?: string }) {
+  return (
+    <Link href={`/artist/${encodeURIComponent(withoutFeat(name))}`} className={`transition hover:text-white ${className}`}>
+      {name}
+    </Link>
   );
 }
 

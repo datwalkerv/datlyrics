@@ -126,7 +126,7 @@ function Releases({ title, artist, items }: { title: string; artist: string; ite
                 <PlayIcon className="size-10" />
               </div>
             </Link>
-            <Link href={`/playlist/${r.listId}`} className="mt-2.5 block truncate font-semibold hover:underline" title={r.title}>
+            <Link href={`/playlist/${r.listId}`} className="mt-2.5 block truncate font-semibold" title={r.title}>
               {r.title}
             </Link>
             <p className="text-sm text-white/45">{r.year}</p>

@@ -128,7 +128,7 @@ export function SavedCard({
       </button>
       {/* The cover plays; a list's name opens its page with the songs. */}
       {item.kind === "playlist" ? (
-        <Link href={`/playlist/${item.id}`} className="mt-2 block truncate text-sm font-semibold text-white/90 hover:underline" title={item.title}>
+        <Link href={`/playlist/${item.id}`} className="mt-2 block truncate text-sm font-semibold text-white/90" title={item.title}>
           {item.title}
         </Link>
       ) : (
