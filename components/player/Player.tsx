@@ -2,7 +2,7 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
-import { useRouter } from "next/navigation";
+import { usePathname, useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
 import { recordPlay } from "@/lib/history";
@@ -127,6 +127,19 @@ export function Player({
   const idle = useIdle(2500, playing && !queueOpen && !settingsOpen && !minimized);
   const nextId = snap.playlist?.[snap.index + 1] ?? null;
   const trackKey = `${snap.index}:${original ?? "none"}`;
+
+  // On /play and /home the tab names the song while it plays; otherwise the page's own title stays.
+  const pathname = usePathname();
+  const tabTitle = playing && song?.title && (pathname === "/play" || pathname === "/home") ? `${song.title} - datlyrics` : null;
+  useEffect(() => {
+    if (!tabTitle) return;
+    const before = document.title;
+    document.title = tabTitle;
+    return () => {
+      // Navigating away, the new page has already set its title; only undo ours.
+      if (document.title === tabTitle) document.title = before;
+    };
+  }, [tabTitle]);
 
   // Feed /home's "Continue listening" and "Recently played" once a track actually plays.
   const playingNow = snap.status === "playing" && playingThisTrack;
