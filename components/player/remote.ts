@@ -68,7 +68,16 @@ if (typeof window !== "undefined") {
 export const isHistoryNav = () => historyNav;
 export const endHistoryNav = () => {
   historyNav = false;
+  resuming = false;
 };
+
+// The mini bar's "Back to lyrics": its URL names what's playing, but it only reveals the player. Saying so beats
+// matching it against now-playing, which can be a track behind (the queue moves on while the navigation loads).
+let resuming = false;
+export const markResume = () => {
+  resuming = true;
+};
+export const isResume = () => resuming;
 
 /** Play this right where you are, in the mini bar; its link opens the lyrics. */
 export function playHere(target: Target) {

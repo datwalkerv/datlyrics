@@ -4,6 +4,7 @@ import { motion } from "motion/react";
 import Link from "next/link";
 import type { SongInfo } from "@/lib/clean-title";
 import { CoverImage } from "./CoverImage";
+import { markResume } from "./remote";
 
 /** What's still playing while you browse home or an artist page, with a way back to the lyrics. */
 export function MiniPlayer({
@@ -48,6 +49,10 @@ export function MiniPlayer({
       </button>
       <Link
         href={href}
+        onClick={(e) => {
+          // A new-tab click doesn't navigate here; there the link starts its song as usual.
+          if (!e.metaKey && !e.ctrlKey && !e.shiftKey && !e.altKey && e.button === 0) markResume();
+        }}
         className="flex shrink-0 items-center gap-1.5 rounded-full bg-white px-4 py-2 text-sm font-semibold text-neutral-950 transition hover:bg-white/90"
       >
         <svg viewBox="0 0 24 24" className="size-4" fill="none" stroke="currentColor" strokeWidth="2.4" aria-hidden>

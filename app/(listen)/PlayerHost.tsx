@@ -8,6 +8,7 @@ import {
   endHistoryNav,
   getNowPlaying,
   isHistoryNav,
+  isResume,
   publishCurrent,
   sameTarget,
   useRequested,
@@ -40,12 +41,12 @@ export function PlayerHost() {
     if (request) setLast(request);
   }
   // A /play address is a new choice, unless it names what's already loaded or playing (the mini bar's
-  // link, the address the player keeps current) or the browser's back/forward brought us to an old one.
+  // link, the address the player keeps current), the mini bar's Back to lyrics, or the browser's back/forward brought us to an old one.
   if (
     hasUrlTarget &&
     !sameTarget(fromUrl, last) &&
     !sameTarget(fromUrl, getNowPlaying()) &&
-    !(isHistoryNav() && last)
+    !((isHistoryNav() || isResume()) && last)
   ) {
     setLast(fromUrl);
   }
