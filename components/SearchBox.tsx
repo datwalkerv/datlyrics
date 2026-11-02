@@ -41,6 +41,14 @@ export function SearchBox({
   const [data, setData] = useState<Results | null>(null);
   const [selected, setSelected] = useState(0);
   const [menu, setMenu] = useState<CardMenuState | null>(null);
+  // Results hide on a click outside (the query stays) and come back when the input is focused or typed in.
+  const rootRef = useRef<HTMLDivElement>(null);
+  const [open, setOpen] = useState(true);
+  useEffect(() => {
+    const onDown = (e: MouseEvent) => !menu && !rootRef.current?.contains(e.target as Node) && setOpen(false);
+    window.addEventListener("mousedown", onDown);
+    return () => window.removeEventListener("mousedown", onDown);
+  }, [menu]);
 
   // Songs in Saved or added to any of your playlists.
   const savedSongs = new Set(useSaved().flatMap((x) => (x.kind === "song" ? [x.id] : (x.added ?? []).map((a) => a.id))));
@@ -87,7 +95,7 @@ export function SearchBox({
   };
 
   return (
-    <>
+    <div ref={rootRef}>
       <div className={`flex items-center ${compact ? "gap-2.5 px-4" : "gap-3 px-6"}`}>
         <svg
           viewBox="0 0 24 24"
@@ -103,7 +111,11 @@ export function SearchBox({
           ref={inputRef}
           autoFocus={autoFocus}
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onFocus={() => setOpen(true)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setOpen(true);
+          }}
           onKeyDown={(e) => {
             if (e.key === "Escape") {
               e.preventDefault();
@@ -133,7 +145,7 @@ export function SearchBox({
         )}
       </div>
 
-      {link && (
+      {open && link && (
         <div className="border-t border-white/10 p-2">
           <button
             onClick={submit}
@@ -150,7 +162,7 @@ export function SearchBox({
         </div>
       )}
 
-      {isWords && (results.length > 0 || (!loading && data)) && (
+      {open && isWords && (results.length > 0 || (!loading && data)) && (
         <ul
           style={{ maxHeight: listMaxHeight }}
           className="overflow-y-auto border-t border-white/10 p-2"
@@ -230,7 +242,7 @@ export function SearchBox({
         )}
 
       {!q && hint && <p className="border-t border-white/10 px-6 py-3 text-xs text-white/35">{hint}</p>}
-    </>
+    </div>
   );
 }
 
