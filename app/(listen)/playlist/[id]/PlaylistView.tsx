@@ -116,20 +116,19 @@ export function PlaylistView() {
                       index={i}
                       duration={remote.durations[songId]}
                       onPlay={() => play(songId)}
-                      {...(addedIds.has(songId) && {
-                        onRemove: () => remove(songId),
-                        onMore: (e: React.MouseEvent, info: { title: string; artist: string } | null) =>
-                          setMenu(
-                            menuAt(e, {
-                              kind: "song",
-                              id: songId,
-                              title: info?.title ?? "",
-                              subtitle: info?.artist ?? "",
-                              image: `https://i.ytimg.com/vi/${songId}/mqdefault.jpg`,
-                              savedAt: 0,
-                            }),
-                          ),
-                      })}
+                      {...(addedIds.has(songId) && { onRemove: () => remove(songId) })}
+                      onMore={(e, info) =>
+                        setMenu(
+                          menuAt(e, {
+                            kind: "song",
+                            id: songId,
+                            title: info?.title ?? "",
+                            subtitle: info?.artist ?? "",
+                            image: `https://i.ytimg.com/vi/${songId}/mqdefault.jpg`,
+                            savedAt: 0,
+                          }),
+                        )
+                      }
                     />
                   ))}
                 </ol>
@@ -170,7 +169,7 @@ function SongRow({
   duration?: string;
   onPlay: () => void;
   onRemove?: () => void;
-  onMore?: (e: React.MouseEvent, info: Info | null) => void;
+  onMore: (e: React.MouseEvent, info: Info | null) => void;
 }) {
   const [info, setInfo] = useState<Info | null>(null);
   useEffect(() => {
@@ -184,7 +183,7 @@ function SongRow({
   }, [id]);
 
   return (
-    <li className="group/row relative rounded-xl transition hover:bg-white/[0.06]">
+    <li className="group/row relative rounded-xl transition hover:bg-white/[0.06]" onContextMenu={(e) => onMore(e, info)}>
       {/* The whole row plays; it's a layer under the content so the artist can be its own link. */}
       <button onClick={onPlay} aria-label={`Play ${info?.title ?? "song"}`} className="absolute inset-0 rounded-xl" />
       <div className="pointer-events-none relative flex w-full items-center gap-4 px-3 py-2.5">
@@ -202,20 +201,20 @@ function SongRow({
         </div>
         {duration && <span className="shrink-0 text-sm tabular-nums text-white/40">{duration}</span>}
         {/* Room for the hover actions, so a long title doesn't run under them. */}
-        {onRemove && <span className="w-20 shrink-0" />}
+        <span className={`shrink-0 ${onRemove ? "w-20" : "w-10"}`} />
       </div>
-      {onRemove && onMore && (
-        <div className="absolute inset-y-0 right-3 flex items-center gap-1 opacity-0 transition group-hover/row:opacity-100 focus-within:opacity-100">
-          <RowAction label={`More for ${info?.title ?? "song"}`} onClick={(e) => onMore(e, info)} onContextMenu={(e) => onMore(e, info)}>
-            <circle cx="5" cy="12" r="1.6" fill="currentColor" />
-            <circle cx="12" cy="12" r="1.6" fill="currentColor" />
-            <circle cx="19" cy="12" r="1.6" fill="currentColor" />
-          </RowAction>
+      <div className="absolute inset-y-0 right-3 flex items-center gap-1 opacity-0 transition group-hover/row:opacity-100 focus-within:opacity-100">
+        <RowAction label={`More for ${info?.title ?? "song"}`} onClick={(e) => onMore(e, info)}>
+          <circle cx="5" cy="12" r="1.6" fill="currentColor" />
+          <circle cx="12" cy="12" r="1.6" fill="currentColor" />
+          <circle cx="19" cy="12" r="1.6" fill="currentColor" />
+        </RowAction>
+        {onRemove && (
           <RowAction label={`Remove ${info?.title ?? "song"} from this playlist`} onClick={onRemove}>
             <path d="M4 7h16M9 7V4h6v3M6 7l1 13h10l1-13" />
           </RowAction>
-        </div>
-      )}
+        )}
+      </div>
     </li>
   );
 }
@@ -223,18 +222,15 @@ function SongRow({
 function RowAction({
   label,
   onClick,
-  onContextMenu,
   children,
 }: {
   label: string;
   onClick: (e: React.MouseEvent) => void;
-  onContextMenu?: (e: React.MouseEvent) => void;
   children: React.ReactNode;
 }) {
   return (
     <button
       onClick={onClick}
-      onContextMenu={onContextMenu}
       aria-label={label}
       title={label}
       className="flex size-9 items-center justify-center rounded-full text-white/55 transition hover:bg-white/10 hover:text-white"
