@@ -1,7 +1,10 @@
 "use client";
 
+import { AnimatePresence } from "motion/react";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState } from "react";
+import { createPortal } from "react-dom";
+import { CardMenu, menuAt, type CardMenuState } from "@/app/(listen)/home/CardMenu";
 import { parseYouTubeUrl, targetToQuery } from "@/lib/parse-youtube-url";
 import { useSaved } from "@/lib/saved";
 import { openSavePicker } from "./PlaylistModals";
@@ -37,6 +40,7 @@ export function SearchBox({
   const [query, setQuery] = useState("");
   const [data, setData] = useState<Results | null>(null);
   const [selected, setSelected] = useState(0);
+  const [menu, setMenu] = useState<CardMenuState | null>(null);
 
   // Songs in Saved or added to any of your playlists.
   const savedSongs = new Set(useSaved().flatMap((x) => (x.kind === "song" ? [x.id] : (x.added ?? []).map((a) => a.id))));
@@ -158,6 +162,18 @@ export function SearchBox({
               role="option"
               aria-selected={i === selected}
               onMouseEnter={() => setSelected(i)}
+              onContextMenu={(e) =>
+                setMenu(
+                  menuAt(e, {
+                    kind: "song",
+                    id: r.id,
+                    title: r.title,
+                    subtitle: r.channel,
+                    image: `https://i.ytimg.com/vi/${r.id}/mqdefault.jpg`,
+                    savedAt: 0,
+                  }),
+                )
+              }
               className={`flex items-center rounded-2xl transition-colors ${i === selected ? "bg-white/10" : ""}`}
             >
               <button onClick={() => play(`/play?v=${r.id}`)} className="flex min-w-0 flex-1 items-center gap-4 py-2.5 pl-3 text-left">
@@ -202,6 +218,16 @@ export function SearchBox({
           )}
         </ul>
       )}
+
+      {/* Portaled: the palette's transform and overflow-hidden would offset and clip a fixed menu.
+          Only while open, so server rendering never touches document. */}
+      {menu &&
+        createPortal(
+          <AnimatePresence>
+            <CardMenu key={`${menu.item.id}:${menu.x}:${menu.y}`} menu={menu} onClose={() => setMenu(null)} />
+          </AnimatePresence>,
+          document.body,
+        )}
 
       {!q && hint && <p className="border-t border-white/10 px-6 py-3 text-xs text-white/35">{hint}</p>}
     </>
