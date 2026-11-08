@@ -93,7 +93,8 @@ export function HomeView() {
       <div className="relative z-10 mx-auto mt-10 flex max-w-6xl flex-col gap-14 px-5 sm:mt-14">
         {seed && recommended?.length !== 0 && (
           <Section title="Recommended for you">
-            <Row>
+            {/* Fresh scroller once loaded: Safari re-snaps a row whose skeletons are swapped for cards, landing it mid-row. */}
+            <Row key={recommended ? "loaded" : "loading"}>
               {recommended
                 ? recommended.map((t) => (
                     <Animated key={t.id}>{card(songItem(t.id, t.title, t.artist, t.image), t.artist)}</Animated>
@@ -127,7 +128,7 @@ export function HomeView() {
                       <h3 className="mb-4 text-sm font-semibold uppercase tracking-[0.16em] text-white/40">
                         {kind === "singles" ? "Singles & EPs" : "Albums"}
                       </h3>
-                      <Row>
+                      <Row key={releases ? "loaded" : "loading"}>
                         {releases
                           ? releases[kind].map((r) => (
                               <Animated key={r.listId}>{card(releaseItem(r), r.artist)}</Animated>
