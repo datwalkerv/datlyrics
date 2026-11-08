@@ -110,7 +110,14 @@ export function Settings({ onClose }: { onClose: () => void }) {
                   : "bg-red-500/10 text-red-300 ring-red-400/30 hover:bg-red-500/20"
               }`}
             >
-              {confirmDelete ? "Click to confirm" : "Delete"}
+              {confirmDelete ? (
+                <>
+                  <span className="touch:hidden">Click to confirm</span>
+                  <span className="hidden touch:inline">Tap to confirm</span>
+                </>
+              ) : (
+                "Delete"
+              )}
             </button>
           </Row>
         </div>

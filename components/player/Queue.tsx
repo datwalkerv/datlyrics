@@ -3,6 +3,7 @@
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
 import { cleanTitle, type SongInfo } from "@/lib/clean-title";
+import { Sheet } from "@/components/Sheet";
 import { fetchVideoInfo } from "./useTrackMeta";
 
 export function Queue({
@@ -10,11 +11,14 @@ export function Queue({
   current,
   onPick,
   onClose,
+  asSheet = false,
 }: {
   ids: string[];
   current: number;
   onPick: (i: number) => void;
   onClose: () => void;
+  /** Touch screens: a bottom sheet instead of the side drawer. */
+  asSheet?: boolean;
 }) {
   const listRef = useRef<HTMLOListElement>(null);
 
@@ -24,6 +28,36 @@ export function Queue({
     el?.scrollIntoView({ block: "center" });
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  const content = (
+    <>
+        <div className="flex items-baseline justify-between px-7 pb-4 pt-7 max-md:pt-3">
+          <h2 className="text-2xl font-bold tracking-tight">Up next</h2>
+          <span className="text-sm font-medium tabular-nums text-white/45">
+            {current + 1} / {ids.length}
+          </span>
+        </div>
+        <ol ref={listRef} className="no-scrollbar min-h-0 flex-1 overflow-y-auto px-3 pb-6">
+          {ids.map((id, i) => (
+            <motion.li
+              key={`${id}:${i}`}
+              initial={{ opacity: 0, x: 24 }}
+              animate={{ opacity: 1, x: 0 }}
+              transition={{ delay: 0.08 + Math.min(Math.abs(i - current), 12) * 0.025, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
+            >
+              <QueueRow id={id} index={i} active={i === current} past={i < current} onPick={onPick} />
+            </motion.li>
+          ))}
+        </ol>
+    </>
+  );
+
+  if (asSheet)
+    return (
+      <Sheet onClose={onClose} label="Up next" className="h-[88dvh]">
+        {content}
+      </Sheet>
+    );
 
   return (
     <motion.div
@@ -42,24 +76,7 @@ export function Queue({
         exit={{ x: "100%" }}
         transition={{ type: "spring", stiffness: 260, damping: 32 }}
       >
-        <div className="flex items-baseline justify-between px-7 pb-4 pt-7">
-          <h2 className="text-2xl font-bold tracking-tight">Up next</h2>
-          <span className="text-sm font-medium tabular-nums text-white/45">
-            {current + 1} / {ids.length}
-          </span>
-        </div>
-        <ol ref={listRef} className="no-scrollbar flex-1 overflow-y-auto px-3 pb-6">
-          {ids.map((id, i) => (
-            <motion.li
-              key={`${id}:${i}`}
-              initial={{ opacity: 0, x: 24 }}
-              animate={{ opacity: 1, x: 0 }}
-              transition={{ delay: 0.08 + Math.min(Math.abs(i - current), 12) * 0.025, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
-            >
-              <QueueRow id={id} index={i} active={i === current} past={i < current} onPick={onPick} />
-            </motion.li>
-          ))}
-        </ol>
+        {content}
       </motion.aside>
     </motion.div>
   );

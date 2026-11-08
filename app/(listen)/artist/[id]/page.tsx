@@ -35,7 +35,7 @@ export async function generateMetadata({ params }: Props): Promise<Metadata> {
 
 export default function ArtistPage({ params }: Props) {
   return (
-    <main className="relative min-h-dvh overflow-x-hidden bg-neutral-950 pb-36 text-white">
+    <main className="relative min-h-dvh overflow-x-hidden bg-neutral-950 pb-[calc(9rem+env(safe-area-inset-bottom))] text-white">
       <Suspense fallback={<ArtistSkeleton />}>
         <Artist params={params} />
       </Suspense>
@@ -58,7 +58,7 @@ async function Artist({ params }: { params: Props["params"] }) {
           className="absolute inset-0 h-full w-full object-cover opacity-60"
         />
         <div className="absolute inset-0 bg-gradient-to-t from-neutral-950 via-neutral-950/60 to-neutral-950/20" />
-        <div className="relative mx-auto flex min-h-[clamp(18rem,45vh,30rem)] max-w-6xl flex-col px-5">
+        <div className="pt-safe relative mx-auto flex min-h-[clamp(18rem,45vh,30rem)] max-w-6xl flex-col px-5">
           <Link href="/home" className="py-6 text-xl font-extrabold tracking-[-0.04em] text-white/80 hover:text-white sm:py-7">
             datlyrics
           </Link>

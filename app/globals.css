@@ -13,6 +13,39 @@ body {
   font-family: var(--font-sans);
 }
 
+/* Phones and tablets: `touch:` styles touch-only UI (transport bar, always-visible card buttons). */
+@custom-variant touch (@media (pointer: coarse));
+
+@utility pt-safe {
+  padding-top: env(safe-area-inset-top);
+}
+@utility pb-safe {
+  padding-bottom: env(safe-area-inset-bottom);
+}
+
+html {
+  -webkit-tap-highlight-color: transparent;
+}
+a,
+button,
+[role="slider"] {
+  touch-action: manipulation;
+}
+/* iOS zooms into inputs under 16px on focus. */
+@media (pointer: coarse) {
+  input,
+  textarea,
+  select {
+    font-size: max(16px, 1em);
+  }
+}
+/* Long-press opens our menu, not iOS's link preview / text selection. */
+.no-callout {
+  -webkit-touch-callout: none;
+  -webkit-user-select: none;
+  user-select: none;
+}
+
 ::selection {
   background: rgb(255 255 255 / 0.25);
 }

@@ -7,6 +7,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { CardMenu, menuAt, type CardMenuState } from "@/app/(listen)/home/CardMenu";
 import { EMPTY_COVER, blockEmpty } from "@/components/PlaylistModals";
 import { CoverImage } from "@/components/player/CoverImage";
+import { longPress } from "@/components/player/hooks";
 import { playHere } from "@/components/player/remote";
 import { fetchVideoInfo } from "@/components/player/useTrackMeta";
 import { ArtistLink } from "@/components/ArtistLink";
@@ -71,8 +72,8 @@ export function PlaylistView() {
   };
 
   return (
-    <main className="relative min-h-dvh overflow-x-hidden bg-neutral-950 pb-36 text-white">
-      <div className="mx-auto max-w-6xl px-5">
+    <main className="relative min-h-dvh overflow-x-hidden bg-neutral-950 pb-[calc(9rem+env(safe-area-inset-bottom))] text-white">
+      <div className="pt-safe mx-auto max-w-6xl px-5">
         <Link href="/home" className="inline-block py-6 text-xl font-extrabold tracking-[-0.04em] text-white/80 hover:text-white sm:py-7">
           datlyrics
         </Link>
@@ -183,7 +184,7 @@ function SongRow({
   }, [id]);
 
   return (
-    <li className="group/row relative rounded-xl transition hover:bg-white/[0.06]" onContextMenu={(e) => onMore(e, info)}>
+    <li className="no-callout group/row relative rounded-xl transition hover:bg-white/[0.06]" onContextMenu={(e) => onMore(e, info)} {...longPress((e) => onMore(e, info))}>
       {/* The whole row plays; it's a layer under the content so the artist can be its own link. */}
       <button onClick={onPlay} aria-label={`Play ${info?.title ?? "song"}`} className="absolute inset-0 rounded-xl" />
       <div className="pointer-events-none relative flex w-full items-center gap-4 px-3 py-2.5">
@@ -203,7 +204,7 @@ function SongRow({
         {/* Room for the hover actions, so a long title doesn't run under them. */}
         <span className={`shrink-0 ${onRemove ? "w-20" : "w-10"}`} />
       </div>
-      <div className="absolute inset-y-0 right-3 flex items-center gap-1 opacity-0 transition group-hover/row:opacity-100 focus-within:opacity-100">
+      <div className="absolute inset-y-0 right-3 flex items-center gap-1 opacity-0 transition group-hover/row:opacity-100 focus-within:opacity-100 touch:opacity-100">
         <RowAction label={`More for ${info?.title ?? "song"}`} onClick={(e) => onMore(e, info)}>
           <circle cx="5" cy="12" r="1.6" fill="currentColor" />
           <circle cx="12" cy="12" r="1.6" fill="currentColor" />

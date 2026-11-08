@@ -12,11 +12,13 @@ const geist = Geist({
 export const metadata: Metadata = {
   title: "datlyrics",
   description: "Premium synced lyrics player for YouTube songs and playlists.",
+  appleWebApp: { capable: true, title: "datlyrics", statusBarStyle: "black-translucent" },
 };
 
 export const viewport: Viewport = {
   themeColor: "#0a0a0a",
   colorScheme: "dark",
+  viewportFit: "cover",
 };
 
 export default function RootLayout({ children }: LayoutProps<"/">) {

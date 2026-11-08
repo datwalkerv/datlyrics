@@ -8,7 +8,9 @@ import { openSearch } from "@/components/SearchPalette";
 import { recordPlay } from "@/lib/history";
 import { openSavePicker } from "@/components/PlaylistModals";
 import { Backdrop } from "./Backdrop";
-import { toggleFullscreen, useIdle, useKeyboard } from "./hooks";
+import { toggleFullscreen, useCoarsePointer, useIdle, useKeyboard } from "./hooks";
+import { Controls, MoreSheet } from "./Controls";
+import { withoutFeat } from "@/lib/clean-title";
 import { LyricsToast } from "./LyricsToast";
 import { MiniPlayer } from "./MiniPlayer";
 import { PLAY_NEXT_EVENT, playHref, publishNowPlaying } from "./remote";
@@ -20,6 +22,7 @@ import { TorchCursor } from "./TorchCursor";
 import { useMediaSession } from "./useMediaSession";
 import { isLowEndDevice, usePerformanceGuard } from "./usePerformanceGuard";
 import { VolumeHud, VolumeSlider } from "./Volume";
+import { ProgressBar } from "./ProgressBar";
 import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
@@ -30,18 +33,26 @@ import { useYouTubePlayer, type ResolveVersion } from "./useYouTubePlayer";
 const VIDEO_PREF_KEY = "datlyrics:video";
 const EFFECTS_PREF_KEY = "datlyrics:effects";
 const VOLUME_PREF_KEY = "datlyrics:volume";
+const VIEW_PREF_KEY = "datlyrics:view";
 
-/** Background effects are on unless turned off with E, and always off on phones and tablets. */
+/** Background effects follow your choice (E, or the More sheet on touch); with none, off on phones, tablets and weak hardware. */
 function readEffectsPref(): boolean {
   if (typeof window === "undefined") return true;
-  // Touch devices: save the battery and GPU (and there's no E key to turn them off).
-  if (window.matchMedia("(pointer: coarse)").matches) return false;
   try {
     const saved = localStorage.getItem(EFFECTS_PREF_KEY);
     if (saved !== null) return saved !== "0";
   } catch {}
-  // No choice made yet: start off on weak hardware, on elsewhere.
-  return !isLowEndDevice();
+  // Touch devices: save the battery and GPU unless asked.
+  return !window.matchMedia("(pointer: coarse)").matches && !isLowEndDevice();
+}
+
+/** Lyrics next to the cover, or the cover alone (C, or the transport's lyrics button). */
+function readViewPref(): "lyrics" | "cover" {
+  try {
+    return typeof window !== "undefined" && localStorage.getItem(VIEW_PREF_KEY) === "cover" ? "cover" : "lyrics";
+  } catch {
+    return "lyrics";
+  }
 }
 
 function readVolumePref(): number {
@@ -83,6 +94,9 @@ export function Player({
   const [effectsManual, setEffectsManual] = useState(false);
   const [queueOpen, setQueueOpen] = useState(false);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState(false);
+  const [view, setView] = useState(readViewPref);
+  const coarse = useCoarsePointer();
   const [loop, setLoop] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   // Which upload each queue entry plays as: its song or its music video, per the current mode.
@@ -124,7 +138,7 @@ export function Player({
 
   const playing = snap.status === "playing" || snap.status === "buffering";
   const hasQueue = (snap.playlist?.length ?? 0) > 1;
-  const idle = useIdle(2500, playing && !queueOpen && !settingsOpen && !minimized);
+  const idle = useIdle(2500, playing && !queueOpen && !settingsOpen && !moreOpen && !minimized);
   const nextId = snap.playlist?.[snap.index + 1] ?? null;
   const trackKey = `${snap.index}:${original ?? "none"}`;
 
@@ -254,6 +268,14 @@ export function Player({
     flash(v ? "Shuffle on" : "Shuffle off");
   };
 
+  const toggleView = () => {
+    const v = view === "lyrics" ? "cover" : "lyrics";
+    setView(v);
+    try {
+      localStorage.setItem(VIEW_PREF_KEY, v);
+    } catch {}
+  };
+
   /** S: pick which playlists the song that's playing is saved to. */
   const toggleSaved = () => {
     if (original) openSavePicker({ id: original, title: song?.title, subtitle: song?.artist, image: artwork });
@@ -353,13 +375,14 @@ export function Player({
   };
   // While settings are open its buttons get the keys (Space/Enter press them), except Esc to close.
   // Minimized, only /home takes playback keys; ↑/↓ stay page scrolling and the rest need the lyrics view.
-  useKeyboard(settingsOpen ? { Escape: () => setSettingsOpen(false) } : minimized ? (playbackKeysWhenMinimized ? playbackKeys : {}) : {
+  useKeyboard(settingsOpen || moreOpen ? { Escape: () => (setSettingsOpen(false), setMoreOpen(false)) } : minimized ? (playbackKeysWhenMinimized ? playbackKeys : {}) : {
     ...playbackKeys,
     ArrowUp: () => changeVolume(volume + 5, true),
     ArrowDown: () => changeVolume(volume - 5, true),
     f: () => toggleFullscreen(),
     e: () => toggleEffects(),
     q: () => hasQueue && setQueueOpen((o) => !o),
+    c: () => lyricsView && toggleView(),
     "[": () => adjustOffset(-0.25),
     "]": () => adjustOffset(0.25),
     Escape: () => {
@@ -384,13 +407,18 @@ export function Player({
       noLyricsMessage = lyrics.instrumental ? "♪ Instrumental" : "Lyrics aren't available for this song";
     }
   }
-  const centered = noLyricsMessage !== null;
+  // Cover view only applies when there are lyrics to hide; otherwise the toggle is off.
+  const coverView = !!lyricsView && view === "cover";
+  const centered = noLyricsMessage !== null || coverView;
+  // Phones show lyrics under a compact title row, with the seek bar in the transport.
+  const compact = !!lyricsView && !coverView;
+  const artistHref = song?.artist ? `/artist/${encodeURIComponent(withoutFeat(song.artist))}` : null;
 
   return (
     <>
       <main
         inert={minimized}
-        className={`cursor-hidden isolate h-dvh w-full overflow-hidden text-white ${idle ? "cursor-idle" : ""} ${
+        className={`cursor-hidden isolate flex h-dvh w-full flex-col overflow-hidden overscroll-none text-white ${idle ? "cursor-idle" : ""} ${
           minimized ? "pointer-events-none fixed inset-0 -z-10 opacity-0" : "relative"
         }`}
       >
@@ -407,10 +435,10 @@ export function Player({
         />
 
         <div
-          className={`grid h-full items-center px-[6vw] py-[8vh] max-md:px-5 max-md:py-6 ${
+          className={`grid min-h-0 flex-1 items-center px-[6vw] py-[8vh] max-md:px-5 max-md:pb-3 max-md:pt-[calc(env(safe-area-inset-top)+4.25rem)] ${
             centered
               ? "grid-cols-1 justify-items-center"
-              : "grid-cols-[minmax(0,40fr)_minmax(0,60fr)] gap-[8vw] max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)] max-md:gap-6"
+              : "grid-cols-[minmax(0,40fr)_minmax(0,60fr)] gap-[8vw] max-md:grid-cols-1 max-md:grid-rows-[auto_minmax(0,1fr)] max-md:gap-4"
           }`}
         >
           <div className={`flex w-full justify-center ${centered ? "" : "md:justify-end"}`}>
@@ -423,6 +451,14 @@ export function Player({
               onSeek={controls.seekTo}
               videoMode={showVideo}
               mediaRef={mediaRef}
+              compact={compact}
+              artistHref={artistHref}
+              // Touch: swipe the cover for next/previous, down to go home.
+              onSwipe={
+                coarse
+                  ? (dir) => (dir === "left" ? controls.next() : dir === "right" ? controls.prev() : router.push("/home"))
+                  : undefined
+              }
             />
           </div>
           {!centered && (
@@ -447,18 +483,31 @@ export function Player({
 
         {/* Subtle chrome that appears while the mouse moves. */}
         <div
-          className={`fixed inset-x-0 top-0 z-20 flex items-center justify-between px-[clamp(1.25rem,3vw,3rem)] py-5 transition-opacity duration-700 ${
+          className={`fixed inset-x-0 top-0 z-20 flex items-center justify-between px-[clamp(1.25rem,3vw,3rem)] pb-5 pt-[calc(env(safe-area-inset-top)+1.25rem)] transition-opacity duration-700 ${
             idle ? "pointer-events-none opacity-0" : "opacity-100"
           }`}
         >
-          <Link href="/home" className="pointer-events-auto text-lg font-bold tracking-tight text-white/70 hover:text-white">
+          <Link href="/home" className="pointer-events-auto text-lg font-bold tracking-tight text-white/70 hover:text-white max-md:hidden touch:hidden">
             datlyrics
           </Link>
+          {/* Phones: a chevron down to home, like closing a native now-playing screen. */}
+          <Link
+            href="/home"
+            aria-label="Home"
+            className="pointer-events-auto -ml-2 hidden size-10 items-center justify-center rounded-full text-white/80 max-md:flex touch:flex"
+          >
+            <svg viewBox="0 0 24 24" className="size-7" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
+              <path d="m6 9 6 6 6-6" />
+            </svg>
+          </Link>
           <div className="flex items-center gap-5">
-            <p className="text-xs font-medium text-white/40 max-md:hidden">
-              ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
+            <p className="text-xs font-medium text-white/40 max-md:hidden touch:hidden">
+              ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · C cover/lyrics · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
             </p>
-            <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
+            {/* Phones set volume with their buttons (iOS ignores page volume). */}
+            <div className="touch:hidden">
+              <VolumeSlider volume={volume} onChange={(v) => changeVolume(v)} />
+            </div>
             {/* Search is the main action, so only it gets a pill; the rest are quiet icons. */}
             <div className="flex items-center gap-1">
               <button
@@ -496,6 +545,40 @@ export function Player({
           </div>
         </div>
 
+        <Controls
+          playing={playing}
+          onToggle={() => controls.toggle()}
+          onNext={() => controls.next()}
+          onPrev={() => controls.prev()}
+          shuffle={shuffle}
+          onShuffle={hasQueue ? toggleShuffle : undefined}
+          loop={loop}
+          onLoop={toggleLoop}
+          view={coverView || !lyricsView ? "cover" : "lyrics"}
+          onView={lyricsView ? toggleView : undefined}
+          onQueue={hasQueue ? () => setQueueOpen(true) : undefined}
+          onSave={toggleSaved}
+          videoMode={videoMode}
+          onVideo={toggleVideo}
+          onMore={() => setMoreOpen(true)}
+          progress={compact ? <ProgressBar clock={clock} duration={snap.duration} onSeek={controls.seekTo} /> : undefined}
+        />
+
+        <AnimatePresence>
+          {moreOpen && (
+            <MoreSheet
+              onClose={() => setMoreOpen(false)}
+              offset={offset}
+              onOffset={adjustOffset}
+              effects={effects}
+              onEffects={toggleEffects}
+              onSearch={openSearch}
+              onSettings={() => setSettingsOpen(true)}
+              artistHref={artistHref}
+            />
+          )}
+        </AnimatePresence>
+
         <VolumeHud volume={volume} show={volumeHud !== null} />
 
         <AnimatePresence>{settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}</AnimatePresence>
@@ -509,6 +592,7 @@ export function Player({
               current={snap.index}
               onPick={(i) => controls.playAt(i)}
               onClose={() => setQueueOpen(false)}
+              asSheet={coarse}
             />
           )}
         </AnimatePresence>
@@ -517,7 +601,7 @@ export function Player({
           {toast && (
             <motion.div
               key={toast.id}
-              className="fixed left-1/2 top-8 z-30 -translate-x-1/2 rounded-full bg-neutral-900/80 px-5 py-2 text-sm font-semibold shadow-xl ring-1 ring-white/10"
+              className="fixed left-1/2 top-[calc(env(safe-area-inset-top)+2rem)] z-30 -translate-x-1/2 whitespace-nowrap rounded-full bg-neutral-900/80 px-5 py-2 text-sm font-semibold shadow-xl ring-1 ring-white/10"
               initial={{ opacity: 0, y: -8 }}
               animate={{ opacity: 1, y: 0 }}
               exit={{ opacity: 0 }}
@@ -528,7 +612,7 @@ export function Player({
           {snap.status === "paused" && (
             <motion.div
               key="paused"
-              className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full bg-neutral-900/75 px-5 py-2 text-sm font-semibold tracking-wide text-white/80 shadow-xl ring-1 ring-white/10"
+              className="pointer-events-none fixed bottom-8 left-1/2 z-30 -translate-x-1/2 rounded-full max-md:hidden touch:hidden bg-neutral-900/75 px-5 py-2 text-sm font-semibold tracking-wide text-white/80 shadow-xl ring-1 ring-white/10"
               initial={{ opacity: 0 }}
               animate={{ opacity: 1 }}
               exit={{ opacity: 0 }}
@@ -581,7 +665,10 @@ export function Player({
           artwork={artwork}
           playing={playing}
           onToggle={() => controls.toggle()}
+          onNext={() => controls.next()}
           href={nowPlayingHref}
+          clock={clock}
+          duration={snap.duration}
         />
       )}
     </>

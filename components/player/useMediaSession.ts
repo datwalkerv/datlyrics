@@ -35,16 +35,50 @@ export function useMediaSession({
   clock: PlayerClock;
 }) {
   const controlsRef = useRef(controls);
+  const statusRef = useRef(status);
   useEffect(() => {
     controlsRef.current = controls;
+    statusRef.current = status;
   });
+
+  // iOS pauses the embed's video when the screen locks or the home-screen app goes to the
+  // background. A pause right after hiding wasn't the listener's (theirs comes through "pause"
+  // below, which clears this): resume, so the car and the lock screen keep playing.
+  // shortcut: a lock-screen pause within 1.5s of locking that bypasses our handler is undone once; drop if Phase 0 shows iOS never pauses.
+  const hiddenWhilePlaying = useRef(0);
+  useEffect(() => {
+    const onVisibility = () => {
+      const s = statusRef.current;
+      hiddenWhilePlaying.current = document.hidden && (s === "playing" || s === "buffering") ? Date.now() : 0;
+    };
+    document.addEventListener("visibilitychange", onVisibility);
+    return () => document.removeEventListener("visibilitychange", onVisibility);
+  }, []);
+  useEffect(() => {
+    if (status !== "paused" || !document.hidden || Date.now() - hiddenWhilePlaying.current > 1500) return;
+    hiddenWhilePlaying.current = 0;
+    controlsRef.current.play();
+  }, [status]);
 
   useEffect(() => {
     if (!("mediaSession" in navigator)) return;
     const ms = navigator.mediaSession;
     const handlers: [MediaSessionAction, MediaSessionActionHandler][] = [
       ["play", () => controlsRef.current.play()],
-      ["pause", () => controlsRef.current.pause()],
+      [
+        "pause",
+        () => {
+          hiddenWhilePlaying.current = 0;
+          controlsRef.current.pause();
+        },
+      ],
+      [
+        "stop",
+        () => {
+          hiddenWhilePlaying.current = 0;
+          controlsRef.current.pause();
+        },
+      ],
       ["nexttrack", () => controlsRef.current.next()],
       ["previoustrack", () => controlsRef.current.prev()],
       ["seekbackward", (d) => controlsRef.current.seekBy(-(d.seekOffset ?? 10))],

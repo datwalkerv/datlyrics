@@ -8,6 +8,7 @@ import { CardMenu, menuAt, type CardMenuState } from "@/app/(listen)/home/CardMe
 import { parseYouTubeUrl, targetToQuery } from "@/lib/parse-youtube-url";
 import { useSaved } from "@/lib/saved";
 import { openSavePicker } from "./PlaylistModals";
+import { longPress } from "./player/hooks";
 import { playHere, playNext } from "./player/remote";
 import type { SearchResult } from "@/lib/search-source";
 
@@ -41,6 +42,17 @@ export function SearchBox({
   const [data, setData] = useState<Results | null>(null);
   const [selected, setSelected] = useState(0);
   const [menu, setMenu] = useState<CardMenuState | null>(null);
+  const openMenu = (e: React.MouseEvent, r: SearchResult) =>
+    setMenu(
+      menuAt(e, {
+        kind: "song",
+        id: r.id,
+        title: r.title,
+        subtitle: r.channel,
+        image: `https://i.ytimg.com/vi/${r.id}/mqdefault.jpg`,
+        savedAt: 0,
+      }),
+    );
   // Results hide on a click outside (the query stays) and come back when the input is focused or typed in.
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(true);
@@ -174,19 +186,9 @@ export function SearchBox({
               role="option"
               aria-selected={i === selected}
               onMouseEnter={() => setSelected(i)}
-              onContextMenu={(e) =>
-                setMenu(
-                  menuAt(e, {
-                    kind: "song",
-                    id: r.id,
-                    title: r.title,
-                    subtitle: r.channel,
-                    image: `https://i.ytimg.com/vi/${r.id}/mqdefault.jpg`,
-                    savedAt: 0,
-                  }),
-                )
-              }
-              className={`flex items-center rounded-2xl transition-colors ${i === selected ? "bg-white/10" : ""}`}
+              onContextMenu={(e) => openMenu(e, r)}
+              {...longPress((e) => openMenu(e, r))}
+              className={`no-callout flex items-center rounded-2xl transition-colors ${i === selected ? "bg-white/10" : ""}`}
             >
               <button onClick={() => play(`/play?v=${r.id}`)} className="flex min-w-0 flex-1 items-center gap-4 py-2.5 pl-3 text-left">
                 {/* eslint-disable-next-line @next/next/no-img-element */}

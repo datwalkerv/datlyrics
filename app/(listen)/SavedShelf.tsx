@@ -7,6 +7,7 @@ import { useEffect } from "react";
 import { ArtistLink } from "@/components/ArtistLink";
 import { CoverImage } from "@/components/player/CoverImage";
 import { EMPTY_COVER, blockEmpty, openCreatePlaylist } from "@/components/PlaylistModals";
+import { longPress } from "@/components/player/hooks";
 import { playHere } from "@/components/player/remote";
 import {
   SAVED_LIST_ID,
@@ -104,7 +105,11 @@ export function SavedCard({
   onContextMenu?: (e: React.MouseEvent) => void;
 }) {
   return (
-    <div className={`group relative shrink-0 text-left ${className}`} onContextMenu={onContextMenu}>
+    <div
+      className={`group relative shrink-0 text-left ${onContextMenu ? "no-callout" : ""} ${className}`}
+      onContextMenu={onContextMenu}
+      {...(onContextMenu ? longPress(onContextMenu) : {})}
+    >
       <button onClick={onPlay} className="block w-full text-left" title={`Play ${item.title}`} aria-label={`Play ${item.title}`}>
         <div className="relative aspect-square w-full overflow-hidden rounded-2xl bg-white/5 ring-1 ring-white/10 transition group-hover:ring-white/30">
           {!item.image && item.kind === "playlist" && <div className={`h-full w-full ${EMPTY_COVER}`} />}
@@ -154,7 +159,7 @@ export function SavedCard({
         <button
           onClick={() => removeItem(item.kind, item.id)}
           aria-label={`Remove ${item.title}`}
-          className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-neutral-800 text-white/70 opacity-0 ring-1 ring-white/15 transition hover:text-white group-hover:opacity-100 focus-visible:opacity-100"
+          className="absolute -right-2 -top-2 flex size-6 items-center justify-center rounded-full bg-neutral-800 text-white/70 opacity-0 ring-1 ring-white/15 transition hover:text-white group-hover:opacity-100 focus-visible:opacity-100 touch:hidden"
         >
           <svg viewBox="0 0 24 24" className="size-3.5" fill="none" stroke="currentColor" strokeWidth="2.5" aria-hidden>
             <path d="M6 6l12 12M18 6 6 18" strokeLinecap="round" />

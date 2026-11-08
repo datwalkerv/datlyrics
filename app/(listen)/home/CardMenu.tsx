@@ -2,7 +2,9 @@
 
 import { motion } from "motion/react";
 import { useEffect, useRef, useState } from "react";
+import { useCoarsePointer } from "@/components/player/hooks";
 import { isPlayerLoaded, playHere, playNext } from "@/components/player/remote";
+import { Sheet } from "@/components/Sheet";
 import { blockEmpty, openEditPlaylist, openSavePicker } from "@/components/PlaylistModals";
 import {
   SAVED_LIST_ID,
@@ -75,6 +77,8 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
   // A single's menu offers saving once its song is known.
   const canSave = !isPinned(item.kind, item.id) && item.id !== SAVED_LIST_ID && (!isSingle || !!singleSong);
   const isSong = item.kind === "song" || isSingle;
+  // Touch screens get a bottom sheet: the long-press point is under the finger.
+  const sheet = useCoarsePointer();
 
   useEffect(() => {
     ref.current?.querySelector<HTMLElement>("[role=menuitem]")?.focus();
@@ -87,7 +91,7 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
       const i = items.indexOf(document.activeElement as HTMLElement);
       items[(i + (e.key === "ArrowDown" ? 1 : -1) + items.length) % items.length]?.focus();
     };
-    window.addEventListener("mousedown", onDown);
+    if (!sheet) window.addEventListener("mousedown", onDown);
     window.addEventListener("keydown", onKey);
     window.addEventListener("scroll", onClose, true);
     window.addEventListener("resize", onClose);
@@ -99,7 +103,7 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
       window.removeEventListener("resize", onClose);
       window.removeEventListener("blur", onClose);
     };
-  }, [onClose]);
+  }, [onClose, sheet]);
 
   const act = (fn: () => void) => () => {
     fn();
@@ -115,6 +119,35 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
       .then(saveItem)
       .catch(() => {});
   };
+
+  const items = (
+    <>
+      <Item onClick={act(() => void queueNext(item))} icon={<QueueIcon />}>
+        Play next
+      </Item>
+      {canSave && (
+        <Item onClick={act(toggleSave)} icon={<HeartIcon filled={!isSong && saved} />}>
+          {isSong ? "Save to playlist…" : saved ? "Remove from your playlists" : "Save to your playlists"}
+        </Item>
+      )}
+      {/* Your own lists, and synced ones on your shelf (pinned included) for the songs you added. */}
+      {item.kind === "playlist" && !isSingle && (isOwnList(item.id) || isPinned(item.kind, item.id) || saved) && (
+        <Item onClick={act(() => openEditPlaylist(item))} icon={<EditIcon />}>
+          Edit playlist
+        </Item>
+      )}
+    </>
+  );
+
+  if (sheet)
+    return (
+      <Sheet onClose={onClose} label={item.title}>
+        <div ref={ref} role="menu" aria-label={item.title} className="px-3 pb-4 text-base">
+          <p className="truncate px-3 pb-3 pt-1 text-lg font-bold">{item.title}</p>
+          {items}
+        </div>
+      </Sheet>
+    );
 
   return (
     <motion.div
@@ -133,20 +166,7 @@ export function CardMenu({ menu, onClose }: { menu: CardMenuState; onClose: () =
       transition={{ duration: 0.14, ease: [0.22, 1, 0.36, 1] }}
       onContextMenu={(e) => e.preventDefault()}
     >
-      <Item onClick={act(() => void queueNext(item))} icon={<QueueIcon />}>
-        Play next
-      </Item>
-      {canSave && (
-        <Item onClick={act(toggleSave)} icon={<HeartIcon filled={!isSong && saved} />}>
-          {isSong ? "Save to playlist…" : saved ? "Remove from your playlists" : "Save to your playlists"}
-        </Item>
-      )}
-      {/* Your own lists, and synced ones on your shelf (pinned included) for the songs you added. */}
-      {item.kind === "playlist" && !isSingle && (isOwnList(item.id) || isPinned(item.kind, item.id) || saved) && (
-        <Item onClick={act(() => openEditPlaylist(item))} icon={<EditIcon />}>
-          Edit playlist
-        </Item>
-      )}
+      {items}
     </motion.div>
   );
 }
@@ -165,7 +185,7 @@ function Item({ onClick, icon, children }: { onClick: () => void; icon: React.Re
     <button
       role="menuitem"
       onClick={onClick}
-      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-medium text-white/85 outline-none transition hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white"
+      className="flex w-full items-center gap-3 rounded-xl px-3 py-2.5 text-left font-medium touch:py-3.5 text-white/85 outline-none transition hover:bg-white/10 hover:text-white focus-visible:bg-white/10 focus-visible:text-white"
     >
       <svg viewBox="0 0 24 24" className="size-4 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden>
         {icon}

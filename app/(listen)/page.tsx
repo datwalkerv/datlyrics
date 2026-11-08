@@ -41,7 +41,7 @@ const EXTRAS = [
   ["Living background", "The blurred cover drifts and breathes behind the lyrics. Built to stay smooth on 4K TVs."],
   ["Saved favorites", "Press S while playing to add a song to your Saved playlist, or keep a whole playlist on the home page. Stored in your browser only."],
   ["Loop and shuffle", "Press L to keep one song on repeat, inside a playlist too. Press R to shuffle a playlist."],
-  ["Keyboard only", "No buttons on screen and a cursor that hides itself. Everything has a shortcut."],
+  ["Keyboard first", "On desktop, no buttons on screen and a cursor that hides itself: everything has a shortcut. On phones, a touch player that works from the lock screen and the car, and Add to Home Screen."],
   ["No account", "No sign-up, no API keys, no cookies, no analytics."],
 ];
 
@@ -52,6 +52,7 @@ const SHORTCUTS: [string[], string][] = [
   [["↑", "↓"], "Volume"],
   [["N", "P"], "Next / previous"],
   [["V"], "Song / music video"],
+  [["C"], "Cover / lyrics view"],
   [["Q"], "Queue"],
   [["S"], "Save to home"],
   [["L"], "Loop"],
@@ -64,7 +65,7 @@ const SHORTCUTS: [string[], string][] = [
 export default function Home() {
   return (
     <main className="relative overflow-x-hidden bg-neutral-950 text-white">
-      <header className="relative z-30 mx-auto flex max-w-6xl items-center justify-between px-5 py-5 sm:py-7">
+      <header className="relative z-30 mx-auto mt-[env(safe-area-inset-top)] flex max-w-6xl items-center justify-between px-5 py-5 sm:py-7">
         <Link href="/home" className="text-xl font-extrabold tracking-[-0.04em]">
           datlyrics
         </Link>
