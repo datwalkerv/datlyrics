@@ -418,11 +418,11 @@ export function Player({
     <>
       <main
         inert={minimized}
-        className={`cursor-hidden isolate flex h-dvh w-full flex-col overflow-hidden overscroll-none text-white ${idle ? "cursor-idle" : ""} ${
+        className={`isolate flex h-dvh w-full flex-col overflow-hidden overscroll-none text-white ${
           minimized ? "pointer-events-none fixed inset-0 -z-10 opacity-0" : "relative"
         }`}
       >
-        {/* The cursor is hidden on the player; the torch is the cursor, lighting the backdrop under the lyrics. */}
+        {/* The torch follows the (always visible) cursor, lighting the backdrop under the lyrics. */}
         <Backdrop src={artwork} animated={effects && !minimized}>
           <TorchCursor active={!idle && !minimized} />
         </Backdrop>

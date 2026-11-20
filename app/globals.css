@@ -50,25 +50,6 @@ button,
   background: rgb(255 255 255 / 0.25);
 }
 
-/*
- * Player cursor: hidden everywhere on the player (the torch takes its place), except over the
- * .cursor-show zones: progress bar, search button, queue. Once idle it hides there too.
- */
-.cursor-hidden,
-.cursor-hidden * {
-  cursor: none !important;
-}
-.cursor-hidden:not(.cursor-idle) .cursor-show,
-.cursor-hidden:not(.cursor-idle) .cursor-show * {
-  cursor: default !important;
-}
-.cursor-hidden:not(.cursor-idle) :is(a, button, [role="slider"]).cursor-show,
-.cursor-hidden:not(.cursor-idle) :is(a, button, [role="slider"]).cursor-show *,
-.cursor-hidden:not(.cursor-idle) .cursor-show :is(a, button, [role="slider"]),
-.cursor-hidden:not(.cursor-idle) .cursor-show :is(a, button, [role="slider"]) * {
-  cursor: pointer !important;
-}
-
 @keyframes breathe {
   0%,
   100% {

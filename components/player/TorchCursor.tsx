@@ -3,9 +3,9 @@
 import { useEffect, useRef } from "react";
 
 /**
- * The player's cursor: the real one is hidden, and a barely-there soft light follows the mouse
- * instead (gliding a touch behind it). It brightens slightly over clickable things and while
- * pressed, and fades out while idle and over the .cursor-show zones, where the real cursor shows.
+ * A barely-there soft light that follows the mouse alongside the real cursor (gliding a touch
+ * behind it). It brightens slightly over clickable things and while pressed, and fades out while
+ * idle and over the .cursor-show zones (panels, progress bar).
  */
 // What counts as clickable for the hover brightening: links, buttons, the seek bar, lyric lines.
 const CLICKABLE = 'a, button, [role="slider"], [data-clickable]';
