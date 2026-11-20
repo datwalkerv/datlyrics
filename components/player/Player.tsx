@@ -583,12 +583,19 @@ export function Player({
 
         <AnimatePresence>{settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}</AnimatePresence>
 
-        {/* OLAK5uy_ lists are YouTube Music albums; on loop the track repeats, so it isn't the end. */}
+        {/* OLAK5uy_ lists are YouTube Music albums. Their last track is the last one before the
+            recommendations (or nothing); on loop it repeats, so it isn't the end. */}
         {!queueOpen && <UpNext
             nextId={nextId}
             clock={clock}
             duration={snap.duration}
-            albumEnd={!loop && !!listId?.startsWith("OLAK5uy_")}
+            albumEnd={
+              !loop &&
+              !!listId?.startsWith("OLAK5uy_") &&
+              !!original &&
+              !snap.radio.includes(original) &&
+              (!nextId || snap.radio.includes(nextId))
+            }
           />}
 
         <AnimatePresence>

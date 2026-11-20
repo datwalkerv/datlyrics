@@ -18,6 +18,8 @@ export type PlayerSnapshot = {
   index: number;
   /** The upload loaded for the current queue slot (the track itself, or its song/video version). */
   loadedId: string | null;
+  /** Queue entries added as recommendations after the list ran out. */
+  radio: string[];
   error: string | null;
 };
 
@@ -30,6 +32,7 @@ const INITIAL: PlayerSnapshot = {
   playlist: null,
   index: 0,
   loadedId: null,
+  radio: [],
   error: null,
 };
 
@@ -149,6 +152,7 @@ export function useYouTubePlayer(
   const loadSeq = useRef(0);
   // Tracks already used to fetch recommendations, so each seed is asked once.
   const radioSeedsRef = useRef(new Set<string>());
+  const radioIdsRef = useRef<string[]>([]);
   // Event handling for the current player.
   const handlers = useRef<{ state: (e: YT.OnStateChangeEvent) => void; error: (e: YT.OnErrorEvent) => void }>({
     state: () => {},
@@ -177,6 +181,7 @@ export function useYouTubePlayer(
       next.playlist = queueRef.current.length ? queueRef.current : null;
       next.index = indexRef.current;
       next.loadedId = loadedIdRef.current;
+      next.radio = radioIdsRef.current;
       statusRef.current = next.status;
       return next;
     });
@@ -231,6 +236,7 @@ export function useYouTubePlayer(
           const extended = [...original, ...fresh];
           queueRef.current = queueRef.current === original ? extended : [...queueRef.current, ...fresh];
           originalRef.current = extended;
+          radioIdsRef.current = [...radioIdsRef.current, ...fresh];
           sync();
           const next = queueRef.current[indexRef.current + 1];
           if (next) void resolve(next);
@@ -560,6 +566,7 @@ export function useYouTubePlayer(
       queueRef.current = [];
       originalRef.current = [];
       radioSeedsRef.current = new Set();
+      radioIdsRef.current = [];
       indexRef.current = 0;
       loadedIdRef.current = null;
       host.remove();

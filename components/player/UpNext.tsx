@@ -9,7 +9,7 @@ import { useClock, type PlayerClock } from "./useYouTubePlayer";
 
 const SHOW_BEFORE_END = 15;
 
-/** `albumEnd`: nothing comes after this track and it closes an album, so say so instead. */
+/** `albumEnd`: this track closes an album; whatever follows is a recommendation (or nothing). */
 export function UpNext({
   nextId,
   clock,
@@ -56,7 +56,7 @@ export function UpNext({
         <motion.div key="next" className={card} {...motionProps}>
           <CoverImage src={next.art} className="size-16 shrink-0 rounded-lg object-cover" />
           <div className="min-w-0">
-            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">Up next</p>
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{albumEnd ? "End of album · Up next" : "Up next"}</p>
             <p className="truncate text-lg font-semibold text-white">{next.song.title}</p>
             <p className="truncate text-sm text-white/60">{next.song.artist}</p>
           </div>
