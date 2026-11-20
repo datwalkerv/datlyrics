@@ -7,7 +7,7 @@ import { pickRedHit } from "../lyrics-source";
 import { activeLineIndex, parseLrc } from "../lrc";
 import { parseImportUrl, parseYouTubeUrl } from "../parse-youtube-url";
 import { parseApple, parseSpotify, pickMatch, toSeconds } from "../import-source";
-import { mergeResults } from "../search-source";
+import { mergeResults, parseAlbums } from "../search-source";
 import { parseRadio } from "../video-source";
 
 describe("parseYouTubeUrl", () => {
@@ -312,5 +312,21 @@ describe("parsePlaylistDurations", () => {
       },
     });
     expect(parsePlaylistDurations({ contents: [row("a", "4:59"), row("b"), row("c", "1:02:03"), row("d", "LIVE")] })).toEqual({ a: "4:59", c: "1:02:03" });
+  });
+});
+
+describe("parseAlbums", () => {
+  const row = (title: string, sub: string, listId?: string) => ({
+    musicResponsiveListItemRenderer: {
+      flexColumns: [title, sub].map((t) => ({ musicResponsiveListItemFlexColumnRenderer: { text: { runs: [{ text: t }] } } })),
+      overlay: listId ? { playNavigationEndpoint: { watchPlaylistEndpoint: { playlistId: listId } } } : {},
+    },
+  });
+  it("reads kind, artist and year, skipping rows without an album playlist", () => {
+    const data = [row("GNX", "Album • Kendrick Lamar • 2024", "OLAK5uy_a"), row("x", "Album • y • 2020"), row("Hi", "EP • Z • 2021", "OLAK5uy_b")];
+    expect(parseAlbums(data)).toEqual([
+      { listId: "OLAK5uy_a", title: "GNX", artist: "Kendrick Lamar", year: "2024", image: null, kind: "Album" },
+      { listId: "OLAK5uy_b", title: "Hi", artist: "Z", year: "2021", image: null, kind: "EP" },
+    ]);
   });
 });

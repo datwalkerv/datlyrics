@@ -1,5 +1,5 @@
 import { cacheLife } from "next/cache";
-import { call, findAll, text } from "./artist-source";
+import { biggestThumb, call, findAll, text, type ArtistRelease } from "./artist-source";
 
 export type SearchResult = {
   id: string;
@@ -46,6 +46,32 @@ export async function searchSongs(query: string): Promise<SearchResult[]> {
     const duration = parts.at(-1) ?? "";
     if (!id || !cols[0] || !/^\d+(:\d\d)+$/.test(duration)) continue;
     results.push({ id, title: cols[0], channel: parts[0], duration });
+  }
+  return results;
+}
+
+const ALBUMS_ONLY = "EgWKAQIYAWoKEAkQBRAKEAMQBA==";
+export type AlbumResult = ArtistRelease & { artist: string };
+
+/** YouTube Music's album results (albums, EPs and singles), each with its OLAK5uy_ playlist id. */
+export async function searchAlbums(query: string): Promise<AlbumResult[]> {
+  "use cache";
+  cacheLife("hours");
+
+  return parseAlbums(await call("search", { query, params: ALBUMS_ONLY }));
+}
+
+export function parseAlbums(data: unknown, max = 4): AlbumResult[] {
+  const results: AlbumResult[] = [];
+  for (const row of findAll(data, "musicResponsiveListItemRenderer")) {
+    const listId = JSON.stringify(row).match(/"playlistId":"(OLAK5uy_[\w-]+)"/)?.[1];
+    const cols = findAll(row.flexColumns, "musicResponsiveListItemFlexColumnRenderer").map((c) => text(c.text));
+    // "Album • Artist • 2024"
+    const [kind, artist = "", year = ""] = (cols[1] ?? "").split(" • ");
+    if (!listId || !cols[0] || results.some((r) => r.listId === listId)) continue;
+    const k = (["Album", "Single", "EP"].includes(kind) ? kind : "Album") as ArtistRelease["kind"];
+    results.push({ listId, title: cols[0], artist, year: /^\d{4}$/.test(year) ? year : "", image: biggestThumb(row.thumbnail), kind: k });
+    if (results.length >= max) break;
   }
   return results;
 }

@@ -7,15 +7,15 @@ import { createPortal } from "react-dom";
 import { CardMenu, menuAt, type CardMenuState } from "@/app/(listen)/home/CardMenu";
 import { parseYouTubeUrl, targetToQuery } from "@/lib/parse-youtube-url";
 import { useSaved } from "@/lib/saved";
-import { openSavePicker } from "./PlaylistModals";
+import { EMPTY_COVER, openSavePicker } from "./PlaylistModals";
 import { longPress } from "./player/hooks";
 import { playHere, playNext } from "./player/remote";
-import type { SearchResult } from "@/lib/search-source";
+import type { AlbumResult, SearchResult } from "@/lib/search-source";
 
-type Results = { q: string; results: SearchResult[]; failed: boolean };
+type Results = { q: string; results: SearchResult[]; albums: AlbumResult[]; failed: boolean };
 
 /**
- * Song search + link input with live YouTube suggestions. Shared by the home page and the
+ * Song and album search + link input with live YouTube suggestions. Shared by the home page and the
  * Cmd+K palette; the caller provides the surrounding card.
  */
 export function SearchBox({
@@ -53,6 +53,18 @@ export function SearchBox({
         savedAt: 0,
       }),
     );
+  const openAlbumMenu = (e: React.MouseEvent, a: AlbumResult) =>
+    setMenu(
+      menuAt(e, {
+        kind: "playlist",
+        id: a.listId,
+        title: a.title,
+        subtitle: [a.artist, a.year].filter(Boolean).join(" · "),
+        image: a.image,
+        savedAt: 0,
+        badge: a.kind,
+      }),
+    );
   // Results hide on a click outside (the query stays) and come back when the input is focused or typed in.
   const rootRef = useRef<HTMLDivElement>(null);
   const [open, setOpen] = useState(true);
@@ -75,13 +87,13 @@ export function SearchBox({
     const ctrl = new AbortController();
     const t = setTimeout(() => {
       fetch(`/api/search?${new URLSearchParams({ q })}`, { signal: ctrl.signal })
-        .then((r) => r.json() as Promise<{ results: SearchResult[]; error?: string }>)
+        .then((r) => r.json() as Promise<{ results: SearchResult[]; albums?: AlbumResult[]; error?: string }>)
         .then((r) => {
-          setData({ q, results: r.results, failed: !!r.error });
+          setData({ q, results: r.results, albums: r.albums ?? [], failed: !!r.error });
           setSelected(0);
         })
         .catch((e) => {
-          if (e.name !== "AbortError") setData({ q, results: [], failed: true });
+          if (e.name !== "AbortError") setData({ q, results: [], albums: [], failed: true });
         });
     }, 250);
     return () => {
@@ -91,6 +103,9 @@ export function SearchBox({
   }, [q, isWords]);
 
   const results = isWords ? (data?.results ?? []) : [];
+  const albums = isWords ? (data?.albums ?? []) : [];
+  // Keyboard selection runs through songs, then albums.
+  const total = results.length + albums.length;
   const loading = isWords && data?.q !== q;
 
   const play = (path: string) => {
@@ -103,7 +118,9 @@ export function SearchBox({
   const submit = () => {
     if (link) return play(`/play?${targetToQuery(link)}`);
     const r = results[selected];
+    const a = albums[selected - results.length];
     if (r) play(`/play?v=${r.id}`);
+    else if (a) play(`/playlist/${a.listId}`);
   };
 
   return (
@@ -136,16 +153,16 @@ export function SearchBox({
             } else if (e.key === "Enter") {
               e.preventDefault();
               submit();
-            } else if (e.key === "ArrowDown" && results.length) {
+            } else if (e.key === "ArrowDown" && total) {
               e.preventDefault();
-              setSelected((s) => (s + 1) % results.length);
-            } else if (e.key === "ArrowUp" && results.length) {
+              setSelected((s) => (s + 1) % total);
+            } else if (e.key === "ArrowUp" && total) {
               e.preventDefault();
-              setSelected((s) => (s - 1 + results.length) % results.length);
+              setSelected((s) => (s - 1 + total) % total);
             }
           }}
-          placeholder="Search a song, or paste a YouTube link"
-          aria-label="Search songs or paste a YouTube link"
+          placeholder="Search a song or album, or paste a YouTube link"
+          aria-label="Search songs and albums or paste a YouTube link"
           className={`min-w-0 flex-1 bg-transparent text-white placeholder:text-white/30 focus:outline-none ${
             compact ? "py-2.5 text-[15px] leading-6" : "py-5 text-xl"
           }`}
@@ -174,7 +191,7 @@ export function SearchBox({
         </div>
       )}
 
-      {open && isWords && (results.length > 0 || (!loading && data)) && (
+      {open && isWords && (total > 0 || (!loading && data)) && (
         <ul
           style={{ maxHeight: listMaxHeight }}
           className="overflow-y-auto border-t border-white/10 p-2"
@@ -225,7 +242,41 @@ export function SearchBox({
               </div>
             </li>
           ))}
-          {!loading && data && results.length === 0 && (
+          {albums.length > 0 && (
+            <li role="presentation" className="px-3 pb-1 pt-3 text-xs font-semibold uppercase tracking-wider text-white/35">
+              Albums
+            </li>
+          )}
+          {albums.map((a, j) => {
+            const i = results.length + j;
+            return (
+              <li
+                key={a.listId}
+                role="option"
+                aria-selected={i === selected}
+                onMouseEnter={() => setSelected(i)}
+                onContextMenu={(e) => openAlbumMenu(e, a)}
+                {...longPress((e) => openAlbumMenu(e, a))}
+                className={`no-callout rounded-2xl transition-colors ${i === selected ? "bg-white/10" : ""}`}
+              >
+                <button onClick={() => play(`/playlist/${a.listId}`)} className="flex w-full min-w-0 items-center gap-4 px-3 py-2.5 text-left">
+                  {a.image ? (
+                    // eslint-disable-next-line @next/next/no-img-element
+                    <img src={a.image} alt="" className="size-12 shrink-0 rounded-lg object-cover" />
+                  ) : (
+                    <span className={`size-12 shrink-0 rounded-lg ${EMPTY_COVER}`} />
+                  )}
+                  <span className="min-w-0 flex-1">
+                    <span className="block truncate font-semibold text-white">{a.title}</span>
+                    <span className="block truncate text-sm text-white/50">
+                      {[a.kind, a.artist, a.year].filter(Boolean).join(" · ")}
+                    </span>
+                  </span>
+                </button>
+              </li>
+            );
+          })}
+          {!loading && data && total === 0 && (
             <li className="px-4 py-6 text-center text-white/45">
               {data.failed ? "Search isn't responding right now." : "No results."}
             </li>
