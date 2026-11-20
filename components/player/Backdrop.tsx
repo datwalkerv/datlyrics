@@ -59,8 +59,40 @@ const LONG_SIDE = 200; // backdrop canvas resolution (long side)
 const FRAME_MS = 42; // ~24 fps while moving: the motion is slow enough that more frames don't show
 const FADE_S = 1.6; // cover crossfade
 const RAMP_S = 1; // effects on/off ease
-const FILTER = "saturate(1.7) brightness(0.9) blur(2px)";
+const COLOR = "saturate(1.7) brightness(0.9)";
+const FILTER = `${COLOR} blur(2px)`;
 const TAU = Math.PI * 2;
+
+/** Safari ignores the canvas 2D `filter` (no blur, no colour), so check it actually draws. */
+let filterWorks: boolean | undefined;
+function canvasFilterWorks() {
+  if (filterWorks !== undefined) return filterWorks;
+  const ctx = document.createElement("canvas").getContext("2d", { willReadFrequently: true })!;
+  ctx.canvas.width = 5;
+  ctx.canvas.height = 1;
+  ctx.filter = "blur(1px)";
+  ctx.fillStyle = "#fff";
+  ctx.fillRect(2, 0, 1, 1);
+  // Blurred, the white pixel spreads to its neighbour.
+  return (filterWorks = ctx.getImageData(1, 0, 1, 1).data[3] > 0);
+}
+
+/** Blur without `ctx.filter`: shrink to 16px in halving steps, then smooth back up the same way. */
+function stepBlur(c: HTMLCanvasElement) {
+  const sizes = [32, 16];
+  let cur = c;
+  for (const size of [...sizes, ...sizes.slice(0, -1).reverse(), SRC_SIZE]) {
+    const n = document.createElement("canvas");
+    n.width = n.height = size;
+    const ctx = n.getContext("2d")!;
+    ctx.imageSmoothingQuality = "high";
+    ctx.drawImage(cur, 0, 0, size, size);
+    cur = n;
+  }
+  const ctx = c.getContext("2d")!;
+  ctx.clearRect(0, 0, SRC_SIZE, SRC_SIZE);
+  ctx.drawImage(cur, 0, 0);
+}
 
 type Scene = { base: HTMLCanvasElement; glow: HTMLCanvasElement; alpha: number; target: number };
 
@@ -72,9 +104,11 @@ function makeSources(img: HTMLImageElement): Pick<Scene, "base" | "glow"> {
     const c = document.createElement("canvas");
     c.width = c.height = SRC_SIZE;
     const ctx = c.getContext("2d")!;
-    ctx.filter = FILTER;
+    ctx.imageSmoothingQuality = "high";
+    if (canvasFilterWorks()) ctx.filter = FILTER;
     // Slightly oversized so the blur doesn't pull dark edges in from outside the image.
     ctx.drawImage(img, sx, sy, side, side, -4, -4, SRC_SIZE + 8, SRC_SIZE + 8);
+    if (!canvasFilterWorks()) stepBlur(c);
     if (round) {
       // The patches' soft round edge, baked in once.
       ctx.filter = "none";
@@ -96,6 +130,9 @@ const approach = (value: number, target: number, maxStep: number) =>
 
 function createEngine(canvas: HTMLCanvasElement) {
   const ctx = canvas.getContext("2d", { alpha: false })!;
+  // No canvas filter (Safari): the colour boost goes on the element instead (a cheap colour
+  // matrix, no blur), so the backdrop looks the same.
+  if (!canvasFilterWorks()) canvas.style.filter = COLOR;
   const reduced = window.matchMedia("(prefers-reduced-motion: reduce)").matches;
   let W = 0;
   let H = 0;
