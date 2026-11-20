@@ -583,7 +583,13 @@ export function Player({
 
         <AnimatePresence>{settingsOpen && <Settings onClose={() => setSettingsOpen(false)} />}</AnimatePresence>
 
-        {!queueOpen && <UpNext nextId={nextId} clock={clock} duration={snap.duration} />}
+        {/* OLAK5uy_ lists are YouTube Music albums; on loop the track repeats, so it isn't the end. */}
+        {!queueOpen && <UpNext
+            nextId={nextId}
+            clock={clock}
+            duration={snap.duration}
+            albumEnd={!loop && !!listId?.startsWith("OLAK5uy_")}
+          />}
 
         <AnimatePresence>
           {queueOpen && snap.playlist && (

@@ -9,7 +9,18 @@ import { useClock, type PlayerClock } from "./useYouTubePlayer";
 
 const SHOW_BEFORE_END = 15;
 
-export function UpNext({ nextId, clock, duration }: { nextId: string | null; clock: PlayerClock; duration: number }) {
+/** `albumEnd`: nothing comes after this track and it closes an album, so say so instead. */
+export function UpNext({
+  nextId,
+  clock,
+  duration,
+  albumEnd = false,
+}: {
+  nextId: string | null;
+  clock: PlayerClock;
+  duration: number;
+  albumEnd?: boolean;
+}) {
   const [next, setNext] = useState<{ id: string; song: SongInfo; art: string } | null>(null);
   const show = useClock(clock, (t) => duration > 40 && t > 5 && duration - t <= SHOW_BEFORE_END);
 
@@ -30,22 +41,32 @@ export function UpNext({ nextId, clock, duration }: { nextId: string | null; clo
   }, [nextId]);
 
   const ready = next && next.id === nextId;
+  const card =
+    "fixed bottom-[clamp(1.25rem,4vh,3rem)] right-[clamp(1.25rem,4vw,4rem)] z-20 flex max-w-[min(26rem,80vw)] items-center gap-4 rounded-2xl bg-neutral-900/75 p-3 pr-6 shadow-2xl ring-1 ring-white/10";
+  const motionProps = {
+    initial: { opacity: 0, y: 24, scale: 0.97 },
+    animate: { opacity: 1, y: 0, scale: 1 },
+    exit: { opacity: 0, y: 16 },
+    transition: { duration: 0.6, ease: [0.22, 1, 0.36, 1] as const },
+  };
 
   return (
     <AnimatePresence>
       {show && ready && (
-        <motion.div
-          className="fixed bottom-[clamp(1.25rem,4vh,3rem)] right-[clamp(1.25rem,4vw,4rem)] z-20 flex max-w-[min(26rem,80vw)] items-center gap-4 rounded-2xl bg-neutral-900/75 p-3 pr-6 shadow-2xl ring-1 ring-white/10"
-          initial={{ opacity: 0, y: 24, scale: 0.97 }}
-          animate={{ opacity: 1, y: 0, scale: 1 }}
-          exit={{ opacity: 0, y: 16 }}
-          transition={{ duration: 0.6, ease: [0.22, 1, 0.36, 1] }}
-        >
+        <motion.div key="next" className={card} {...motionProps}>
           <CoverImage src={next.art} className="size-16 shrink-0 rounded-lg object-cover" />
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">Up next</p>
             <p className="truncate text-lg font-semibold text-white">{next.song.title}</p>
             <p className="truncate text-sm text-white/60">{next.song.artist}</p>
+          </div>
+        </motion.div>
+      )}
+      {show && !nextId && albumEnd && (
+        <motion.div key="end" className={`${card} py-4 pl-5`} {...motionProps}>
+          <div className="min-w-0">
+            <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">End of album</p>
+            <p className="truncate text-lg font-semibold text-white">This is the last track</p>
           </div>
         </motion.div>
       )}
