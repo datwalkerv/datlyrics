@@ -4,7 +4,7 @@ import { useEffect, useState } from "react";
 import { classifyUpload, cleanTitle, type SongInfo } from "@/lib/clean-title";
 import type { Version } from "@/lib/counterpart-source";
 import type { LyricsResult } from "@/lib/lyrics-source";
-import type { VideoInfo } from "@/lib/video-source";
+import type { PlaylistInfo, VideoInfo } from "@/lib/video-source";
 
 export type TrackMeta = SongInfo & {
   videoId: string;
@@ -42,6 +42,41 @@ export function fetchArtwork({ artist, title }: SongInfo) {
   return cached(`art:${q}`, () =>
     getJson<{ url: string | null }>(`/api/artwork?${q}`).then((r) => r.url),
   );
+}
+
+/** An album's cover and track ids; null when it isn't an album (OLAK5uy_ lists are). */
+function fetchAlbum(listId: string) {
+  if (!listId.startsWith("OLAK5uy_")) return Promise.resolve(null);
+  return cached(`album:${listId}`, () =>
+    Promise.all([
+      getJson<PlaylistInfo>(`/api/playlist/${listId}`),
+      getJson<{ ids: string[] }>(`/api/playlist/${listId}/tracks`),
+    ]).then(([info, tracks]) => (info.thumbnail ? { cover: info.thumbnail, ids: tracks.ids } : null)),
+  );
+}
+
+/**
+ * The album's cover while one of its tracks plays, so a song first released as a single (with
+ * another cover) doesn't show that one. `undefined`: not an album track, use the song's artwork;
+ * null: still finding out.
+ */
+export function useAlbumCover(listId: string | undefined, videoId: string | null): string | null | undefined {
+  const [album, setAlbum] = useState<{ listId: string; value: { cover: string; ids: string[] } | null } | null>(null);
+
+  useEffect(() => {
+    if (!listId) return;
+    let alive = true;
+    fetchAlbum(listId)
+      .catch(() => null)
+      .then((value) => alive && setAlbum({ listId, value }));
+    return () => {
+      alive = false;
+    };
+  }, [listId]);
+
+  if (!listId?.startsWith("OLAK5uy_")) return undefined;
+  if (album?.listId !== listId) return null;
+  return videoId && album.value?.ids.includes(videoId) ? album.value.cover : undefined;
 }
 
 /** `videoId` is the upload playing; it goes along so a song nobody has synced can be sent to datlrc. */
