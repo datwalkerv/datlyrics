@@ -22,10 +22,11 @@ export function PlaylistView() {
   const saved = useSaved();
   const item = saved.find((x) => x.kind === "playlist" && x.id === id);
   const local = isLocalList(id);
-  const [remote, setRemote] = useState<{ header: Header | null; ids: string[] | null; durations: Record<string, string>; failed: boolean }>({
+  const [remote, setRemote] = useState<{ header: Header | null; ids: string[] | null; durations: Record<string, string>; titles: Record<string, string>; failed: boolean }>({
     header: null,
     ids: null,
     durations: {},
+    titles: {},
     failed: false,
   });
 
@@ -35,13 +36,14 @@ export function PlaylistView() {
     const json = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(url))));
     Promise.all([
       json(`/api/playlist/${id}`).catch(() => null) as Promise<{ title: string; channel: string; thumbnail: string | null; kind: string | null } | null>,
-      json(`/api/playlist/${id}/tracks`).catch(() => null) as Promise<{ ids: string[]; durations?: Record<string, string> } | null>,
+      json(`/api/playlist/${id}/tracks`).catch(() => null) as Promise<{ ids: string[]; durations?: Record<string, string>; titles?: Record<string, string> } | null>,
     ]).then(([info, tracks]) => {
       if (!alive) return;
       setRemote({
         header: info && { title: info.title, subtitle: info.channel, image: info.thumbnail, badge: info.kind ?? undefined },
         ids: tracks?.ids ?? null,
         durations: tracks?.durations ?? {},
+        titles: tracks?.titles ?? {},
         failed: !info && !tracks,
       });
     });
@@ -123,6 +125,7 @@ export function PlaylistView() {
                       id={songId}
                       index={i}
                       duration={remote.durations[songId]}
+                      title={remote.titles[songId]}
                       onPlay={() => play(songId)}
                       {...(addedIds.has(songId) && { onRemove: () => remove(songId) })}
                       onMore={(e, info) =>
@@ -167,6 +170,7 @@ function SongRow({
   id,
   index,
   duration,
+  title,
   onPlay,
   onRemove,
   onMore,
@@ -175,6 +179,8 @@ function SongRow({
   index: number;
   /** Only known for a synced list's own tracks (it comes with them); other songs show none rather than cost a lookup each. */
   duration?: string;
+  /** The list's own title for it, when it has one: it keeps the feat. */
+  title?: string;
   onPlay: () => void;
   onRemove?: () => void;
   onMore: (e: React.MouseEvent, info: Info | null) => void;
@@ -183,12 +189,16 @@ function SongRow({
   useEffect(() => {
     let alive = true;
     fetchVideoInfo(id)
-      .then((v) => alive && setInfo(cleanTitle(v.title, v.channel)))
+      .then((v) => {
+        if (!alive) return;
+        const info = cleanTitle(v.title, v.channel);
+        setInfo(title ? { ...info, title } : info);
+      })
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [id]);
+  }, [id, title]);
 
   return (
     <li className="no-callout group/row relative rounded-xl transition hover:bg-white/[0.06]" onContextMenu={(e) => onMore(e, info)} {...longPress((e) => onMore(e, info))}>
