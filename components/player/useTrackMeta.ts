@@ -44,13 +44,17 @@ export function fetchArtwork({ artist, title }: SongInfo) {
   );
 }
 
+function fetchTracks(listId: string) {
+  return cached(`tracks:${listId}`, () => getJson<{ ids: string[]; titles?: Record<string, string> }>(`/api/playlist/${listId}/tracks`));
+}
+
 /** An album's cover and track ids; null when it isn't an album (OLAK5uy_ lists are). */
 function fetchAlbum(listId: string) {
   if (!listId.startsWith("OLAK5uy_")) return Promise.resolve(null);
   return cached(`album:${listId}`, () =>
     Promise.all([
       getJson<PlaylistInfo>(`/api/playlist/${listId}`),
-      getJson<{ ids: string[] }>(`/api/playlist/${listId}/tracks`),
+      fetchTracks(listId),
     ]).then(([info, tracks]) => (info.thumbnail ? { cover: info.thumbnail, ids: tracks.ids } : null)),
   );
 }
@@ -128,6 +132,24 @@ export function useSongInfo(videoId: string | null, rawTitle: string, channel: s
   if (!videoId) return null;
   if (rawTitle) return cleanTitle(rawTitle, channel);
   return fromApi?.id === videoId ? fromApi.info : null;
+}
+
+/** The list's own title for a track ("Song (feat. X)"), which a Topic upload's title drops; null if it has none. */
+export function useListTitle(listId: string | undefined, videoId: string | null): string | null {
+  const [titles, setTitles] = useState<{ listId: string; value: Record<string, string> } | null>(null);
+
+  useEffect(() => {
+    if (!listId) return;
+    let alive = true;
+    fetchTracks(listId)
+      .then((t) => alive && setTitles({ listId, value: t.titles ?? {} }))
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, [listId]);
+
+  return (videoId && titles?.listId === listId && titles?.value[videoId]) || null;
 }
 
 /** Album artwork URL for a song, or the YouTube thumbnail if no match. `null` while loading. */

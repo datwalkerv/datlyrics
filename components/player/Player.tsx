@@ -3,7 +3,7 @@
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
 import { useRouter } from "next/navigation";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useMemo, useRef, useState } from "react";
 import { openSearch } from "@/components/SearchPalette";
 import { recordPlay } from "@/lib/history";
 import { openSavePicker } from "@/components/PlaylistModals";
@@ -27,7 +27,7 @@ import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
 import { mapTimeByLyrics } from "@/lib/lrc";
-import { fetchLyrics, pickVersion, useAlbumCover, useArtwork, useLyrics, useSongInfo } from "./useTrackMeta";
+import { fetchLyrics, pickVersion, useAlbumCover, useArtwork, useListTitle, useLyrics, useSongInfo } from "./useTrackMeta";
 import { useYouTubePlayer, type ResolveVersion } from "./useYouTubePlayer";
 
 const VIDEO_PREF_KEY = "datlyrics:video";
@@ -132,7 +132,12 @@ export function Player({
   const playingOriginal = snap.videoId === original;
   // Until the slot's upload has actually loaded, the player still reports the previous track.
   const playingThisTrack = !!snap.videoId && snap.videoId === snap.loadedId;
-  const song = useSongInfo(original, playingOriginal ? snap.rawTitle : "", playingOriginal ? snap.channel : "");
+  const videoSong = useSongInfo(original, playingOriginal ? snap.rawTitle : "", playingOriginal ? snap.channel : "");
+  const listTitle = useListTitle(listId, original);
+  const artist = videoSong?.artist;
+  const title = listTitle ?? videoSong?.title;
+  // Keyed on the strings: videoSong is a fresh object every render.
+  const song = useMemo(() => (artist !== undefined && title !== undefined ? { artist, title } : null), [artist, title]);
   const songArtwork = useArtwork(original, song);
   const albumCover = useAlbumCover(listId, original);
   const artwork = albumCover === undefined ? songArtwork : albumCover;
