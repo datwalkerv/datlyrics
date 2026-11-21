@@ -61,6 +61,12 @@ export function PlaylistView() {
   const hydrated = useSyncExternalStore(noop, () => true, () => false);
   const missing = (hydrated && local && id !== SAVED_LIST_ID && !item) || remote.failed;
 
+  // Durations arrive as "m:ss" or "h:mm:ss"; only total when every song has one, else the sum would be short.
+  const seconds = ids?.length && ids.every((s) => remote.durations[s])
+    ? ids.reduce((sum, s) => sum + remote.durations[s].split(":").reduce((a, p) => a * 60 + Number(p), 0), 0)
+    : 0;
+  const length = seconds >= 3600 ? `${Math.floor(seconds / 3600)}h ${Math.floor((seconds % 3600) / 60)}m` : `${Math.round(seconds / 60)}m`;
+
   const [menu, setMenu] = useState<CardMenuState | null>(null);
   // Songs you put here (every song of a local list, the added ones of a synced list) can be removed; the synced tracks can't.
   const addedIds = new Set(local ? ids : item?.added?.map((a) => a.id));
@@ -95,6 +101,7 @@ export function PlaylistView() {
                   {/* An album's subtitle is its artist; a playlist's is its owner or "Your playlist". */}
                   {header?.subtitle && header.badge && header.badge !== "Playlist" ? <ArtistLink name={header.subtitle} /> : header?.subtitle}
                   {ids && ` · ${ids.length} song${ids.length === 1 ? "" : "s"}`}
+                  {seconds > 0 && ` · ${length}`}
                 </p>
                 <button
                   onClick={() => play()}
