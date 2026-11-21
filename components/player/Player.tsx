@@ -27,7 +27,7 @@ import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
 import { mapTimeByLyrics } from "@/lib/lrc";
-import { fetchLyrics, pickVersion, useAlbumCover, useArtwork, useListTitle, useLyrics, useSongInfo } from "./useTrackMeta";
+import { fetchLyrics, pickVersion, useAlbum, useArtwork, useListTitle, useLyrics, useSongInfo } from "./useTrackMeta";
 import { useYouTubePlayer, type ResolveVersion } from "./useYouTubePlayer";
 
 const VIDEO_PREF_KEY = "datlyrics:video";
@@ -139,9 +139,9 @@ export function Player({
   // Keyed on the strings: videoSong is a fresh object every render.
   const song = useMemo(() => (artist !== undefined && title !== undefined ? { artist, title } : null), [artist, title]);
   const songArtwork = useArtwork(original, song);
-  const albumCover = useAlbumCover(listId, original);
-  const artwork = albumCover === undefined ? songArtwork : albumCover;
-  const nextAlbumCover = useAlbumCover(listId, snap.playlist?.[snap.index + 1] ?? null);
+  const album = useAlbum(listId, original);
+  const artwork = album === undefined ? songArtwork : (album?.cover ?? null);
+  const nextAlbum = useAlbum(listId, snap.playlist?.[snap.index + 1] ?? null);
   const lyrics = useLyrics(song, playingThisTrack ? snap.duration : 0, snap.videoId);
 
   const playing = snap.status === "playing" || snap.status === "buffering";
@@ -461,6 +461,7 @@ export function Player({
               mediaRef={mediaRef}
               compact={compact}
               artistHref={artistHref}
+              album={album && listId ? { title: album.title, href: `/playlist/${listId}` } : null}
               // Touch: swipe the cover for next/previous, down to go home.
               onSwipe={
                 coarse
@@ -597,7 +598,7 @@ export function Player({
             nextId={nextId}
             clock={clock}
             duration={snap.duration}
-            cover={nextAlbumCover ?? undefined}
+            cover={nextAlbum?.cover}
             albumEnd={
               !loop &&
               !!listId?.startsWith("OLAK5uy_") &&

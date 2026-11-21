@@ -18,6 +18,7 @@ export function NowPlaying({
   mediaRef,
   compact = false,
   artistHref,
+  album,
   onSwipe,
 }: {
   trackKey: string;
@@ -32,6 +33,8 @@ export function NowPlaying({
   /** Phones in lyrics view: one row of small cover, title and artist above the lyrics. */
   compact?: boolean;
   artistHref: string | null;
+  /** The album the track is playing from, shown after the artist. */
+  album: { title: string; href: string } | null;
   /** Touch: swipe the cover left/right for next/previous, down to leave. */
   onSwipe?: (dir: "left" | "right" | "down") => void;
 }) {
@@ -101,6 +104,14 @@ export function NowPlaying({
               </Link>
             ) : (
               " "
+            )}
+            {album && (
+              <>
+                {" · "}
+                <Link href={album.href} className="cursor-show transition hover:text-white">
+                  {album.title}
+                </Link>
+              </>
             )}
           </p>
         </motion.div>

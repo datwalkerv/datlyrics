@@ -48,24 +48,26 @@ function fetchTracks(listId: string) {
   return cached(`tracks:${listId}`, () => getJson<{ ids: string[]; titles?: Record<string, string> }>(`/api/playlist/${listId}/tracks`));
 }
 
-/** An album's cover and track ids; null when it isn't an album (OLAK5uy_ lists are). */
+/** An album's title, cover and track ids; null when it isn't an album (OLAK5uy_ lists are). */
 function fetchAlbum(listId: string) {
   if (!listId.startsWith("OLAK5uy_")) return Promise.resolve(null);
   return cached(`album:${listId}`, () =>
     Promise.all([
       getJson<PlaylistInfo>(`/api/playlist/${listId}`),
       fetchTracks(listId),
-    ]).then(([info, tracks]) => (info.thumbnail ? { cover: info.thumbnail, ids: tracks.ids } : null)),
+    ]).then(([info, tracks]) => (info.thumbnail ? { title: info.title, cover: info.thumbnail, ids: tracks.ids } : null)),
   );
 }
 
+export type Album = { title: string; cover: string };
+
 /**
- * The album's cover while one of its tracks plays, so a song first released as a single (with
- * another cover) doesn't show that one. `undefined`: not an album track, use the song's artwork;
- * null: still finding out.
+ * The album while one of its tracks plays: its cover, so a song first released as a single (with
+ * another cover) doesn't show that one, and its title. `undefined`: not an album track, use the
+ * song's artwork; null: still finding out.
  */
-export function useAlbumCover(listId: string | undefined, videoId: string | null): string | null | undefined {
-  const [album, setAlbum] = useState<{ listId: string; value: { cover: string; ids: string[] } | null } | null>(null);
+export function useAlbum(listId: string | undefined, videoId: string | null): Album | null | undefined {
+  const [album, setAlbum] = useState<{ listId: string; value: (Album & { ids: string[] }) | null } | null>(null);
 
   useEffect(() => {
     if (!listId) return;
@@ -80,7 +82,7 @@ export function useAlbumCover(listId: string | undefined, videoId: string | null
 
   if (!listId?.startsWith("OLAK5uy_")) return undefined;
   if (album?.listId !== listId) return null;
-  return videoId && album.value?.ids.includes(videoId) ? album.value.cover : undefined;
+  return videoId && album.value?.ids.includes(videoId) ? album.value : undefined;
 }
 
 /** `videoId` is the upload playing; it goes along so a song nobody has synced can be sent to datlrc. */
