@@ -27,7 +27,7 @@ import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
 import { mapTimeByLyrics } from "@/lib/lrc";
-import { fetchLyrics, pickVersion, useAlbum, useArtwork, useListTitles, useLyrics, useSongInfo } from "./useTrackMeta";
+import { fetchLyrics, pickVersion, useAlbum, useArtwork, useListSongs, useLyrics, useSongInfo } from "./useTrackMeta";
 import { useYouTubePlayer, type ResolveVersion } from "./useYouTubePlayer";
 
 const VIDEO_PREF_KEY = "datlyrics:video";
@@ -133,12 +133,15 @@ export function Player({
   // Until the slot's upload has actually loaded, the player still reports the previous track.
   const playingThisTrack = !!snap.videoId && snap.videoId === snap.loadedId;
   const videoSong = useSongInfo(original, playingOriginal ? snap.rawTitle : "", playingOriginal ? snap.channel : "");
-  const listTitles = useListTitles(listId);
-  const listTitle = original ? listTitles[original] : undefined;
+  const listSongs = useListSongs(listId);
+  const listed = original ? listSongs[original] : undefined;
   const artist = videoSong?.artist;
-  const title = listTitle ?? videoSong?.title;
+  const title = listed?.title ?? videoSong?.title;
   // Keyed on the strings: videoSong is a fresh object every render.
   const song = useMemo(() => (artist !== undefined && title !== undefined ? { artist, title } : null), [artist, title]);
+  // What's shown: every credited artist ("A & B"); `song` keeps the main one for lookups and links.
+  const shownArtist = listed?.artist || artist;
+  const shown = useMemo(() => (shownArtist !== undefined && title !== undefined ? { artist: shownArtist, title } : null), [shownArtist, title]);
   const songArtwork = useArtwork(original, song);
   const album = useAlbum(listId, original);
   const artwork = album === undefined ? songArtwork : (album?.cover ?? null);
@@ -175,8 +178,8 @@ export function Player({
   const playingNow = snap.status === "playing" && playingThisTrack;
   useEffect(() => {
     if (playingNow && original && song)
-      recordPlay({ id: original, title: song.title, artist: song.artist, image: artwork, listId: listId ?? null });
-  }, [playingNow, original, song, artwork, listId]);
+      recordPlay({ id: original, title: song.title, artist: shown?.artist ?? song.artist, image: artwork, listId: listId ?? null });
+  }, [playingNow, original, song, shown, artwork, listId]);
   const offset = offsetState.id === snap.videoId ? offsetState.value : 0;
   // A song upload has nothing to watch (static cover); keep the artwork even in video mode.
   const showVideo = videoMode && classifyUpload(snap.rawTitle, snap.channel) !== "song";
@@ -287,7 +290,7 @@ export function Player({
 
   /** S: pick which playlists the song that's playing is saved to. */
   const toggleSaved = () => {
-    if (original) openSavePicker({ id: original, title: song?.title, subtitle: song?.artist, image: artwork });
+    if (original) openSavePicker({ id: original, title: shown?.title, subtitle: shown?.artist, image: artwork });
   };
 
   /** YouTube Music's Song/Video switch: swap to the other upload, continuing at the same point in the song. */
@@ -361,7 +364,7 @@ export function Player({
     if (mount) mount.style.opacity = showVideo && videoVisible ? "1" : "0";
   }, [showVideo, videoVisible]);
 
-  useMediaSession({ controls, song, artwork, status: snap.status, duration: snap.duration, clock });
+  useMediaSession({ controls, song: shown, artwork, status: snap.status, duration: snap.duration, clock });
 
   // The page (home or artist) has the keyboard while minimized (media keys still work via the Media Session).
   // Keys that act on playback itself, so they also make sense from /home's mini bar.
@@ -453,7 +456,7 @@ export function Player({
           <div className={`flex w-full justify-center ${centered ? "" : "md:justify-end"}`}>
             <NowPlaying
               trackKey={trackKey}
-              song={song}
+              song={shown}
               artwork={artwork}
               clock={clock}
               duration={snap.duration}
@@ -600,6 +603,7 @@ export function Player({
             clock={clock}
             duration={snap.duration}
             cover={nextAlbum?.cover}
+            listed={nextId ? listSongs[nextId] : undefined}
             albumEnd={
               !loop &&
               !!listId?.startsWith("OLAK5uy_") &&
@@ -614,7 +618,7 @@ export function Player({
             <Queue
               ids={snap.playlist}
               current={snap.index}
-              titles={listTitles}
+              songs={listSongs}
               onPick={(i) => controls.playAt(i)}
               onClose={() => setQueueOpen(false)}
               asSheet={coarse}
@@ -686,7 +690,7 @@ export function Player({
       </AnimatePresence>
       {minimized && (
         <MiniPlayer
-          song={song}
+          song={shown}
           artwork={artwork}
           playing={playing}
           onToggle={() => controls.toggle()}

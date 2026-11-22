@@ -22,11 +22,11 @@ export function PlaylistView() {
   const saved = useSaved();
   const item = saved.find((x) => x.kind === "playlist" && x.id === id);
   const local = isLocalList(id);
-  const [remote, setRemote] = useState<{ header: Header | null; ids: string[] | null; durations: Record<string, string>; titles: Record<string, string>; failed: boolean }>({
+  const [remote, setRemote] = useState<{ header: Header | null; ids: string[] | null; durations: Record<string, string>; songs: Record<string, { title: string; artist: string }>; failed: boolean }>({
     header: null,
     ids: null,
     durations: {},
-    titles: {},
+    songs: {},
     failed: false,
   });
 
@@ -36,14 +36,14 @@ export function PlaylistView() {
     const json = (url: string) => fetch(url).then((r) => (r.ok ? r.json() : Promise.reject(new Error(url))));
     Promise.all([
       json(`/api/playlist/${id}`).catch(() => null) as Promise<{ title: string; channel: string; thumbnail: string | null; kind: string | null } | null>,
-      json(`/api/playlist/${id}/tracks`).catch(() => null) as Promise<{ ids: string[]; durations?: Record<string, string>; titles?: Record<string, string> } | null>,
+      json(`/api/playlist/${id}/tracks`).catch(() => null) as Promise<{ ids: string[]; durations?: Record<string, string>; songs?: Record<string, { title: string; artist: string }> } | null>,
     ]).then(([info, tracks]) => {
       if (!alive) return;
       setRemote({
         header: info && { title: info.title, subtitle: info.channel, image: info.thumbnail, badge: info.kind ?? undefined },
         ids: tracks?.ids ?? null,
         durations: tracks?.durations ?? {},
-        titles: tracks?.titles ?? {},
+        songs: tracks?.songs ?? {},
         failed: !info && !tracks,
       });
     });
@@ -125,7 +125,7 @@ export function PlaylistView() {
                       id={songId}
                       index={i}
                       duration={remote.durations[songId]}
-                      title={remote.titles[songId]}
+                      listed={remote.songs[songId]}
                       onPlay={() => play(songId)}
                       {...(addedIds.has(songId) && { onRemove: () => remove(songId) })}
                       onMore={(e, info) =>
@@ -164,13 +164,14 @@ export function PlaylistView() {
 const noop = () => () => {};
 
 // shortcut: one title lookup per row (cached), like the edit modal; fine for ~100 songs, batch it if lists get much longer.
-type Info = { title: string; artist: string };
+/** `artist` is what's shown (every credit); `main` is who the artist link opens. */
+type Info = { title: string; artist: string; main: string };
 
 function SongRow({
   id,
   index,
   duration,
-  title,
+  listed,
   onPlay,
   onRemove,
   onMore,
@@ -179,8 +180,8 @@ function SongRow({
   index: number;
   /** Only known for a synced list's own tracks (it comes with them); other songs show none rather than cost a lookup each. */
   duration?: string;
-  /** The list's own title for it, when it has one: it keeps the feat. */
-  title?: string;
+  /** The list's own title and artists, when it has them: they keep the credits ("feat. X", "A & B"). */
+  listed?: { title: string; artist: string };
   onPlay: () => void;
   onRemove?: () => void;
   onMore: (e: React.MouseEvent, info: Info | null) => void;
@@ -191,14 +192,14 @@ function SongRow({
     fetchVideoInfo(id)
       .then((v) => {
         if (!alive) return;
-        const info = cleanTitle(v.title, v.channel);
-        setInfo(title ? { ...info, title } : info);
+        const song = cleanTitle(v.title, v.channel);
+        setInfo({ title: listed?.title ?? song.title, artist: listed?.artist || song.artist, main: song.artist });
       })
       .catch(() => {});
     return () => {
       alive = false;
     };
-  }, [id, title]);
+  }, [id, listed]);
 
   return (
     <li className="no-callout group/row relative rounded-xl transition hover:bg-white/[0.06]" onContextMenu={(e) => onMore(e, info)} {...longPress((e) => onMore(e, info))}>
@@ -215,7 +216,7 @@ function SongRow({
         </div>
         <div className="min-w-0 flex-1">
           <p className="truncate font-semibold">{info?.title ?? "…"}</p>
-          <p className="truncate text-sm text-white/45">{info?.artist && <ArtistLink name={info.artist} className="pointer-events-auto" />}</p>
+          <p className="truncate text-sm text-white/45">{info?.artist && <ArtistLink name={info.artist} linkTo={info.main} className="pointer-events-auto" />}</p>
         </div>
         {duration && <span className="shrink-0 text-sm tabular-nums text-white/40">{duration}</span>}
         {/* Room for the hover actions, so a long title doesn't run under them. */}

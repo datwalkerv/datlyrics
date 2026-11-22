@@ -16,6 +16,7 @@ export function UpNext({
   duration,
   albumEnd = false,
   cover,
+  listed,
 }: {
   nextId: string | null;
   clock: PlayerClock;
@@ -23,6 +24,8 @@ export function UpNext({
   albumEnd?: boolean;
   /** The next track's album cover, used instead of looking its artwork up. */
   cover?: string;
+  /** The list's own title and artists for the next track, shown over the upload's. */
+  listed?: SongInfo;
 }) {
   const [next, setNext] = useState<{ id: string; song: SongInfo; art: string } | null>(null);
   const show = useClock(clock, (t) => duration > 40 && t > 5 && duration - t <= SHOW_BEFORE_END);
@@ -60,8 +63,8 @@ export function UpNext({
           <CoverImage src={cover ?? next.art} className="size-16 shrink-0 rounded-lg object-cover" />
           <div className="min-w-0">
             <p className="text-xs font-semibold uppercase tracking-[0.18em] text-white/50">{albumEnd ? "End of album · Up next" : "Up next"}</p>
-            <p className="truncate text-lg font-semibold text-white">{next.song.title}</p>
-            <p className="truncate text-sm text-white/60">{next.song.artist}</p>
+            <p className="truncate text-lg font-semibold text-white">{listed?.title ?? next.song.title}</p>
+            <p className="truncate text-sm text-white/60">{listed?.artist || next.song.artist}</p>
           </div>
         </motion.div>
       )}

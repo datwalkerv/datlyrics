@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 import { parseBackup } from "../backup";
 import { insertNext, mergeAdded } from "../queue";
-import { mergeReleases, parseArtist, parsePlaylistArtists, parsePlaylistDurations, parsePlaylistTitles, rankArtists } from "../artist-source";
+import { mergeReleases, parseArtist, parsePlaylistArtists, parsePlaylistDurations, parsePlaylistSongs, rankArtists } from "../artist-source";
 import { cleanTitle } from "../clean-title";
 import { pickRedHit } from "../lyrics-source";
 import { activeLineIndex, parseLrc } from "../lrc";
@@ -315,13 +315,15 @@ describe("parsePlaylistDurations", () => {
   });
 });
 
-describe("parsePlaylistTitles", () => {
-  it("reads each row's first flex column, keeping the feat", () => {
+describe("parsePlaylistSongs", () => {
+  it("reads each row's title and artist columns, keeping the credits", () => {
     const col = (t: string) => ({ musicResponsiveListItemFlexColumnRenderer: { text: { runs: [{ text: t }] } } });
     const row = (videoId: string, title?: string) => ({
-      musicResponsiveListItemRenderer: { playlistItemData: { videoId }, flexColumns: title ? [col(title), col("Artist")] : [] },
+      musicResponsiveListItemRenderer: { playlistItemData: { videoId }, flexColumns: title ? [col(title), col("gyuris & Susa")] : [] },
     });
-    expect(parsePlaylistTitles({ contents: [row("a", "elég (feat. Ricky the Tricky)"), row("b")] })).toEqual({ a: "elég (feat. Ricky the Tricky)" });
+    expect(parsePlaylistSongs({ contents: [row("a", "elég (feat. Ricky the Tricky)"), row("b")] })).toEqual({
+      a: { title: "elég (feat. Ricky the Tricky)", artist: "gyuris & Susa" },
+    });
   });
 });
 

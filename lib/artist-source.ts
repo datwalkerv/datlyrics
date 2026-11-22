@@ -166,21 +166,24 @@ export function rankArtists(credits: string[], max = 4): string[] {
 }
 
 /** A playlist's (or album's) tracks in order, from its first page (YouTube Music shows ~100). */
-export async function getPlaylistTracks(listId: string): Promise<{ ids: string[]; durations: Record<string, string>; titles: Record<string, string> }> {
+export async function getPlaylistTracks(listId: string): Promise<{ ids: string[]; durations: Record<string, string>; songs: Record<string, { title: string; artist: string }> }> {
   "use cache";
   cacheLife("hours");
 
   const data = await call("browse", { browseId: `VL${listId}` });
-  return { ids: parsePlaylistTracks(data), durations: parsePlaylistDurations(data), titles: parsePlaylistTitles(data) };
+  return { ids: parsePlaylistTracks(data), durations: parsePlaylistDurations(data), songs: parsePlaylistSongs(data) };
 }
 
-/** Each track's title as the list shows it, which keeps the "(feat. X)" a Topic upload's own title drops. */
-export function parsePlaylistTitles(data: unknown): Record<string, string> {
-  const out: Record<string, string> = {};
+/**
+ * Each track's title and artists as the list shows them. A Topic upload's own title drops the
+ * credits: "Song (feat. X)" in the title, or "A & B" in the artist column.
+ */
+export function parsePlaylistSongs(data: unknown): Record<string, { title: string; artist: string }> {
+  const out: Record<string, { title: string; artist: string }> = {};
   for (const row of findAll(data, "musicResponsiveListItemRenderer")) {
     const id = (row.playlistItemData as { videoId?: string } | undefined)?.videoId;
-    const t = findAll(row.flexColumns, "musicResponsiveListItemFlexColumnRenderer").map((c) => text(c.text))[0];
-    if (id && t) out[id] = t;
+    const [title, artist = ""] = findAll(row.flexColumns, "musicResponsiveListItemFlexColumnRenderer").map((c) => text(c.text));
+    if (id && title) out[id] = { title, artist };
   }
   return out;
 }

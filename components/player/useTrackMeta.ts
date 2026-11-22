@@ -45,7 +45,7 @@ export function fetchArtwork({ artist, title }: SongInfo) {
 }
 
 function fetchTracks(listId: string) {
-  return cached(`tracks:${listId}`, () => getJson<{ ids: string[]; titles?: Record<string, string> }>(`/api/playlist/${listId}/tracks`));
+  return cached(`tracks:${listId}`, () => getJson<{ ids: string[]; songs?: Record<string, SongInfo> }>(`/api/playlist/${listId}/tracks`));
 }
 
 /** An album's title, cover and track ids; null when it isn't an album (OLAK5uy_ lists are). */
@@ -136,24 +136,27 @@ export function useSongInfo(videoId: string | null, rawTitle: string, channel: s
   return fromApi?.id === videoId ? fromApi.info : null;
 }
 
-const NO_TITLES: Record<string, string> = {};
+const NO_SONGS: Record<string, SongInfo> = {};
 
-/** The list's own titles by video id ("Song (feat. X)"), which a Topic upload's title drops. */
-export function useListTitles(listId: string | undefined): Record<string, string> {
-  const [titles, setTitles] = useState<{ listId: string; value: Record<string, string> } | null>(null);
+/**
+ * The list's own title and artists by video id, which keep the credits a Topic upload drops
+ * ("Song (feat. X)", "A & B"). For display: lookups stay on the upload's main artist.
+ */
+export function useListSongs(listId: string | undefined): Record<string, SongInfo> {
+  const [songs, setSongs] = useState<{ listId: string; value: Record<string, SongInfo> } | null>(null);
 
   useEffect(() => {
     if (!listId) return;
     let alive = true;
     fetchTracks(listId)
-      .then((t) => alive && setTitles({ listId, value: t.titles ?? {} }))
+      .then((t) => alive && setSongs({ listId, value: t.songs ?? {} }))
       .catch(() => {});
     return () => {
       alive = false;
     };
   }, [listId]);
 
-  return (listId && titles?.listId === listId && titles?.value) || NO_TITLES;
+  return (listId && songs?.listId === listId && songs?.value) || NO_SONGS;
 }
 
 /** Album artwork URL for a song, or the YouTube thumbnail if no match. `null` while loading. */
