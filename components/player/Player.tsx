@@ -547,7 +547,7 @@ export function Player({
               ).map(([label, on], i) => (
                 <span key={label}>
                   {i > 0 && " · "}
-                  <span className={on ? "text-white/75" : undefined}>{label}</span>
+                  <span className={on ? "text-white/60" : undefined}>{label}</span>
                 </span>
               ))}
             </p>
