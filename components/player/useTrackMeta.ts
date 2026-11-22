@@ -136,8 +136,10 @@ export function useSongInfo(videoId: string | null, rawTitle: string, channel: s
   return fromApi?.id === videoId ? fromApi.info : null;
 }
 
-/** The list's own title for a track ("Song (feat. X)"), which a Topic upload's title drops; null if it has none. */
-export function useListTitle(listId: string | undefined, videoId: string | null): string | null {
+const NO_TITLES: Record<string, string> = {};
+
+/** The list's own titles by video id ("Song (feat. X)"), which a Topic upload's title drops. */
+export function useListTitles(listId: string | undefined): Record<string, string> {
   const [titles, setTitles] = useState<{ listId: string; value: Record<string, string> } | null>(null);
 
   useEffect(() => {
@@ -151,7 +153,7 @@ export function useListTitle(listId: string | undefined, videoId: string | null)
     };
   }, [listId]);
 
-  return (videoId && titles?.listId === listId && titles?.value[videoId]) || null;
+  return (listId && titles?.listId === listId && titles?.value) || NO_TITLES;
 }
 
 /** Album artwork URL for a song, or the YouTube thumbnail if no match. `null` while loading. */

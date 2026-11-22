@@ -9,12 +9,15 @@ import { fetchVideoInfo } from "./useTrackMeta";
 export function Queue({
   ids,
   current,
+  titles,
   onPick,
   onClose,
   asSheet = false,
 }: {
   ids: string[];
   current: number;
+  /** The list's own titles, which keep the feat a Topic upload's title drops. */
+  titles: Record<string, string>;
   onPick: (i: number) => void;
   onClose: () => void;
   /** Touch screens: a bottom sheet instead of the side drawer. */
@@ -45,7 +48,7 @@ export function Queue({
               animate={{ opacity: 1, x: 0 }}
               transition={{ delay: 0.08 + Math.min(Math.abs(i - current), 12) * 0.025, duration: 0.4, ease: [0.22, 1, 0.36, 1] }}
             >
-              <QueueRow id={id} index={i} active={i === current} past={i < current} onPick={onPick} />
+              <QueueRow id={id} title={titles[id]} index={i} active={i === current} past={i < current} onPick={onPick} />
             </motion.li>
           ))}
         </ol>
@@ -84,12 +87,14 @@ export function Queue({
 
 function QueueRow({
   id,
+  title,
   index,
   active,
   past,
   onPick,
 }: {
   id: string;
+  title?: string;
   index: number;
   active: boolean;
   past: boolean;
@@ -146,7 +151,7 @@ function QueueRow({
       </div>
       <div className="min-w-0 flex-1">
         <p className={`truncate font-semibold ${unavailable ? "text-white/35" : "text-white"}`}>
-          {unavailable ? "Unavailable video" : (song?.title ?? " ")}
+          {unavailable ? "Unavailable video" : ((song && (title ?? song.title)) ?? " ")}
         </p>
         <p className="truncate text-sm text-white/50">{song?.artist || " "}</p>
       </div>

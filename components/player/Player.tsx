@@ -27,7 +27,7 @@ import { SyncedLyrics } from "./SyncedLyrics";
 import { UpNext } from "./UpNext";
 import { classifyUpload } from "@/lib/clean-title";
 import { mapTimeByLyrics } from "@/lib/lrc";
-import { fetchLyrics, pickVersion, useAlbum, useArtwork, useListTitle, useLyrics, useSongInfo } from "./useTrackMeta";
+import { fetchLyrics, pickVersion, useAlbum, useArtwork, useListTitles, useLyrics, useSongInfo } from "./useTrackMeta";
 import { useYouTubePlayer, type ResolveVersion } from "./useYouTubePlayer";
 
 const VIDEO_PREF_KEY = "datlyrics:video";
@@ -133,7 +133,8 @@ export function Player({
   // Until the slot's upload has actually loaded, the player still reports the previous track.
   const playingThisTrack = !!snap.videoId && snap.videoId === snap.loadedId;
   const videoSong = useSongInfo(original, playingOriginal ? snap.rawTitle : "", playingOriginal ? snap.channel : "");
-  const listTitle = useListTitle(listId, original);
+  const listTitles = useListTitles(listId);
+  const listTitle = original ? listTitles[original] : undefined;
   const artist = videoSong?.artist;
   const title = listTitle ?? videoSong?.title;
   // Keyed on the strings: videoSong is a fresh object every render.
@@ -613,6 +614,7 @@ export function Player({
             <Queue
               ids={snap.playlist}
               current={snap.index}
+              titles={listTitles}
               onPick={(i) => controls.playAt(i)}
               onClose={() => setQueueOpen(false)}
               asSheet={coarse}
