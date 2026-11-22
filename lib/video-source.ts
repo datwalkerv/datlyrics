@@ -1,5 +1,6 @@
 import { cacheLife } from "next/cache";
 import { biggestThumb, findAll, text } from "./artist-source";
+import { dropTopic } from "./clean-title";
 
 export type VideoInfo = { title: string; channel: string };
 
@@ -94,7 +95,7 @@ export async function getPlaylistInfo(id: string): Promise<PlaylistInfo | null> 
   const album = header.kind && header.kind !== "Playlist";
   return {
     title: (album && header.title) || data.title,
-    channel: (album && header.artist) || data.author_name,
+    channel: dropTopic((album && header.artist) || data.author_name),
     thumbnail: header.cover ?? fallback,
     kind: header.kind,
   };

@@ -1,5 +1,6 @@
 import { cacheLife } from "next/cache";
 import { biggestThumb, call, findAll, text, type ArtistRelease } from "./artist-source";
+import { dropTopic } from "./clean-title";
 
 export type SearchResult = {
   id: string;
@@ -45,7 +46,7 @@ export async function searchSongs(query: string): Promise<SearchResult[]> {
     const parts = (cols[1] ?? "").split(" • ");
     const duration = parts.at(-1) ?? "";
     if (!id || !cols[0] || !/^\d+(:\d\d)+$/.test(duration)) continue;
-    results.push({ id, title: cols[0], channel: parts[0], duration });
+    results.push({ id, title: cols[0], channel: dropTopic(parts[0]), duration });
   }
   return results;
 }
@@ -111,7 +112,7 @@ export async function searchVideos(query: string): Promise<SearchResult[]> {
     results.push({
       id: v.videoId,
       title: v.title?.runs?.map((r) => r.text).join("") ?? "",
-      channel: v.ownerText?.runs?.[0]?.text ?? "",
+      channel: dropTopic(v.ownerText?.runs?.[0]?.text ?? ""),
       duration: v.lengthText.simpleText,
     });
     if (results.length >= 8) break;

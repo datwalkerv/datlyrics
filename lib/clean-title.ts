@@ -6,6 +6,9 @@ const NOISE =
 
 const SEPARATORS = [" - ", " – ", " — ", " -- ", " | ", " ~ "];
 
+/** "Artist - Topic" (YouTube auto-generated channel) → "Artist". */
+export const dropTopic = (channel: string) => channel.replace(/\s*-\s*Topic$/i, "");
+
 export function cleanChannel(channel: string): string {
   return channel
     .replace(/\s*-\s*Topic$/i, "")
