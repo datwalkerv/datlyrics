@@ -457,6 +457,7 @@ export function Player({
             <NowPlaying
               trackKey={trackKey}
               song={shown}
+              credits={listed?.credits}
               artwork={artwork}
               clock={clock}
               duration={snap.duration}

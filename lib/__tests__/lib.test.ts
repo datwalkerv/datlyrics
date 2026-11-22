@@ -317,12 +317,22 @@ describe("parsePlaylistDurations", () => {
 
 describe("parsePlaylistSongs", () => {
   it("reads each row's title and artist columns, keeping the credits", () => {
-    const col = (t: string) => ({ musicResponsiveListItemFlexColumnRenderer: { text: { runs: [{ text: t }] } } });
+    const A = "UC0omhdXWrh55CkozmWODI4w";
+    const B = "UCv-R2hotWjXaN8kSl9sQXQQ";
+    const run = (text: string, id?: string) => ({ text, ...(id && { navigationEndpoint: { browseEndpoint: { browseId: id } } }) });
+    const col = (...runs: object[]) => ({ musicResponsiveListItemFlexColumnRenderer: { text: { runs } } });
     const row = (videoId: string, title?: string) => ({
-      musicResponsiveListItemRenderer: { playlistItemData: { videoId }, flexColumns: title ? [col(title), col("gyuris & Susa")] : [] },
+      musicResponsiveListItemRenderer: {
+        playlistItemData: { videoId },
+        flexColumns: title ? [col(run(title)), col(run("gyuris", A), run(" & "), run("Susa", B))] : [],
+      },
     });
     expect(parsePlaylistSongs({ contents: [row("a", "elég (feat. Ricky the Tricky)"), row("b")] })).toEqual({
-      a: { title: "elég (feat. Ricky the Tricky)", artist: "gyuris & Susa" },
+      a: {
+        title: "elég (feat. Ricky the Tricky)",
+        artist: "gyuris & Susa",
+        credits: [{ text: "gyuris", id: A }, { text: " & " }, { text: "Susa", id: B }],
+      },
     });
   });
 });

@@ -1,5 +1,10 @@
 import { cacheLife } from "next/cache";
 
+/** One run of an artist credit: a name with its channel id, or the text between ("& "). */
+export type Credit = { text: string; id?: string };
+/** A list's own title and artists for a track; `artist` is the credits joined. */
+export type ListSong = { title: string; artist: string; credits: Credit[] };
+
 export type ArtistSong = { id: string; title: string; album: string; image: string | null };
 export type ArtistRelease = {
   listId: string;
@@ -166,7 +171,7 @@ export function rankArtists(credits: string[], max = 4): string[] {
 }
 
 /** A playlist's (or album's) tracks in order, from its first page (YouTube Music shows ~100). */
-export async function getPlaylistTracks(listId: string): Promise<{ ids: string[]; durations: Record<string, string>; songs: Record<string, { title: string; artist: string }> }> {
+export async function getPlaylistTracks(listId: string): Promise<{ ids: string[]; durations: Record<string, string>; songs: Record<string, ListSong> }> {
   "use cache";
   cacheLife("hours");
 
@@ -178,12 +183,18 @@ export async function getPlaylistTracks(listId: string): Promise<{ ids: string[]
  * Each track's title and artists as the list shows them. A Topic upload's own title drops the
  * credits: "Song (feat. X)" in the title, or "A & B" in the artist column.
  */
-export function parsePlaylistSongs(data: unknown): Record<string, { title: string; artist: string }> {
-  const out: Record<string, { title: string; artist: string }> = {};
+export function parsePlaylistSongs(data: unknown): Record<string, ListSong> {
+  const out: Record<string, ListSong> = {};
   for (const row of findAll(data, "musicResponsiveListItemRenderer")) {
     const id = (row.playlistItemData as { videoId?: string } | undefined)?.videoId;
-    const [title, artist = ""] = findAll(row.flexColumns, "musicResponsiveListItemFlexColumnRenderer").map((c) => text(c.text));
-    if (id && title) out[id] = { title, artist };
+    const [titleCol, artistCol] = findAll(row.flexColumns, "musicResponsiveListItemFlexColumnRenderer");
+    const title = text(titleCol?.text);
+    type Run = { text: string; navigationEndpoint?: { browseEndpoint?: { browseId?: string } } };
+    const credits = ((artistCol?.text as { runs?: Run[] } | undefined)?.runs ?? []).map((r): Credit => {
+      const channel = r.navigationEndpoint?.browseEndpoint?.browseId;
+      return channel && isChannelId(channel) ? { text: r.text, id: channel } : { text: r.text };
+    });
+    if (id && title) out[id] = { title, artist: credits.map((c) => c.text).join(""), credits };
   }
   return out;
 }

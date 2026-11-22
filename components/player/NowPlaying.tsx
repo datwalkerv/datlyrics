@@ -2,6 +2,8 @@
 
 import { AnimatePresence, motion } from "motion/react";
 import Link from "next/link";
+import { ArtistCredits } from "@/components/ArtistLink";
+import type { Credit } from "@/lib/artist-source";
 import type { SongInfo } from "@/lib/clean-title";
 import { CoverImage } from "./CoverImage";
 import { ProgressBar } from "./ProgressBar";
@@ -10,6 +12,7 @@ import type { PlayerClock } from "./useYouTubePlayer";
 export function NowPlaying({
   trackKey,
   song,
+  credits,
   artwork,
   clock,
   duration,
@@ -23,6 +26,8 @@ export function NowPlaying({
 }: {
   trackKey: string;
   song: SongInfo | null;
+  /** The list's artist credits, each its own link; without them the artist line links the main artist. */
+  credits?: Credit[];
   artwork: string | null;
   clock: PlayerClock;
   duration: number;
@@ -95,7 +100,9 @@ export function NowPlaying({
             {song?.title ?? " "}
           </h1>
           <p className={`mt-1 truncate text-[clamp(1rem,1.5vw,1.6rem)] font-medium text-white/60 ${c("max-md:!mt-0 max-md:!text-sm")}`}>
-            {song?.artist && artistHref ? (
+            {credits?.some((c) => c.id) ? (
+              <ArtistCredits credits={credits} className="cursor-show" />
+            ) : song?.artist && artistHref ? (
               <Link
                 href={artistHref}
                 className="cursor-show transition hover:text-white"

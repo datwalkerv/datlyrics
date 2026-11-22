@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from "react";
 import { classifyUpload, cleanTitle, type SongInfo } from "@/lib/clean-title";
+import type { ListSong } from "@/lib/artist-source";
 import type { Version } from "@/lib/counterpart-source";
 import type { LyricsResult } from "@/lib/lyrics-source";
 import type { PlaylistInfo, VideoInfo } from "@/lib/video-source";
@@ -45,7 +46,7 @@ export function fetchArtwork({ artist, title }: SongInfo) {
 }
 
 function fetchTracks(listId: string) {
-  return cached(`tracks:${listId}`, () => getJson<{ ids: string[]; songs?: Record<string, SongInfo> }>(`/api/playlist/${listId}/tracks`));
+  return cached(`tracks:${listId}`, () => getJson<{ ids: string[]; songs?: Record<string, ListSong> }>(`/api/playlist/${listId}/tracks`));
 }
 
 /** An album's title, cover and track ids; null when it isn't an album (OLAK5uy_ lists are). */
@@ -136,14 +137,14 @@ export function useSongInfo(videoId: string | null, rawTitle: string, channel: s
   return fromApi?.id === videoId ? fromApi.info : null;
 }
 
-const NO_SONGS: Record<string, SongInfo> = {};
+const NO_SONGS: Record<string, ListSong> = {};
 
 /**
  * The list's own title and artists by video id, which keep the credits a Topic upload drops
  * ("Song (feat. X)", "A & B"). For display: lookups stay on the upload's main artist.
  */
-export function useListSongs(listId: string | undefined): Record<string, SongInfo> {
-  const [songs, setSongs] = useState<{ listId: string; value: Record<string, SongInfo> } | null>(null);
+export function useListSongs(listId: string | undefined): Record<string, ListSong> {
+  const [songs, setSongs] = useState<{ listId: string; value: Record<string, ListSong> } | null>(null);
 
   useEffect(() => {
     if (!listId) return;

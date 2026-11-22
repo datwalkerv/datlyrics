@@ -1,4 +1,5 @@
 import Link from "next/link";
+import type { Credit } from "@/lib/artist-source";
 import { withoutFeat } from "@/lib/clean-title";
 
 /**
@@ -10,5 +11,18 @@ export function ArtistLink({ name, linkTo = name, className = "" }: { name: stri
     <Link href={`/artist/${encodeURIComponent(withoutFeat(linkTo))}`} className={`transition hover:text-white ${className}`}>
       {name}
     </Link>
+  );
+}
+
+/** Every credited artist as its own link ("gyuris & Susa" → two links); the text between stays plain. */
+export function ArtistCredits({ credits, className = "" }: { credits: Credit[]; className?: string }) {
+  return credits.map((c, i) =>
+    c.id ? (
+      <Link key={i} href={`/artist/${c.id}`} className={`transition hover:text-white ${className}`}>
+        {c.text}
+      </Link>
+    ) : (
+      <span key={i}>{c.text}</span>
+    ),
   );
 }
