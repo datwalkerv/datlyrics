@@ -129,6 +129,9 @@ export function useYouTubePlayer(
   const statusRef = useRef<PlayerStatus>("loading");
   const volumeRef = useRef(initialVolume);
   const loopRef = useRef(false);
+  // Reaction mode: stop at the end of each track; play then moves on.
+  const pauseAfterRef = useRef(false);
+  const pauseTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
   const shuffleRef = useRef(false);
   // The playlist in its own order; queueRef holds it shuffled while shuffle is on.
   const originalRef = useRef<string[]>([]);
@@ -441,6 +444,7 @@ export function useYouTubePlayer(
               const i = indexRef.current;
               // Replay the slot (same path as next) so it wins over the embed's own advance.
               if (loopRef.current) playIndex(i);
+              else if (pauseAfterRef.current) sync({ status: "ended" }); // the timer missed it (throttled tab): wait for play
               else if (i < queueRef.current.length - 1) playIndex(i + 1);
               else sync({ status: "ended" });
               return;
@@ -579,15 +583,28 @@ export function useYouTubePlayer(
   // eslint-disable-next-line react-hooks/refs
   const [clock] = useState(() => createClock(playerRef, statusRef));
 
-  const controls = useMemo(
-    () => ({
-      play: () => playerRef.current?.playVideo(),
+  useEffect(() => () => clearInterval(pauseTimerRef.current), []);
+
+  const controls = useMemo(() => {
+    /** Reaction mode stopped this track at its end, so play should start the next one. */
+    const atEnd = () => {
+      const p = playerRef.current;
+      if (!p || !pauseAfterRef.current) return false;
+      if (statusRef.current === "ended") return true;
+      return statusRef.current === "paused" && (p.getDuration?.() ?? 0) - p.getCurrentTime() <= 1.5;
+    };
+    const play = () => {
+      if (atEnd()) playIndex(indexRef.current + 1);
+      else playerRef.current?.playVideo();
+    };
+    return {
+      play,
       pause: () => playerRef.current?.pauseVideo(),
       toggle: () => {
         const p = playerRef.current;
         if (!p) return;
         if (statusRef.current === "playing") p.pauseVideo();
-        else p.playVideo();
+        else play();
       },
       seekBy: (s: number) => {
         const p = playerRef.current;
@@ -606,6 +623,19 @@ export function useYouTubePlayer(
       /** Repeat the current track instead of moving on when it ends. */
       setLoop: (on: boolean) => {
         loopRef.current = on;
+      },
+      /** Reaction mode: pause just before each track ends (so the embed never starts the next), and let play move on. */
+      setPauseAfter: (on: boolean) => {
+        pauseAfterRef.current = on;
+        clearInterval(pauseTimerRef.current);
+        if (!on) return;
+        pauseTimerRef.current = setInterval(() => {
+          const p = playerRef.current;
+          if (!p || loopRef.current || statusRef.current !== "playing") return;
+          const left = (p.getDuration?.() ?? 0) - p.getCurrentTime();
+          // Hidden tabs run timers about once a second: stop earlier there so the end isn't missed.
+          if (left > 0 && left <= (document.hidden ? 1.2 : 0.35)) p.pauseVideo();
+        }, 250);
       },
       /** Play the rest of the queue in random order; off goes back to playlist order. */
       setShuffle: (on: boolean) => {
@@ -645,9 +675,8 @@ export function useYouTubePlayer(
         loadSeq.current++;
         loadId(id, getStart());
       },
-    }),
-    [playIndex, loadId, reorder, sync, prefetchAround],
-  );
+    };
+  }, [playIndex, loadId, reorder, sync, prefetchAround]);
 
   return { snap, clock, controls };
 }

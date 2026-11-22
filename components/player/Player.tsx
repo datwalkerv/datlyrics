@@ -98,6 +98,7 @@ export function Player({
   const [view, setView] = useState(readViewPref);
   const coarse = useCoarsePointer();
   const [loop, setLoop] = useState(false);
+  const [pauseAfter, setPauseAfter] = useState(false);
   const [shuffle, setShuffle] = useState(false);
   // Which upload each queue entry plays as: its song or its music video, per the current mode.
   const resolveFor = (want: "song" | "video"): ResolveVersion => (id) => pickVersion(id, want).then((v) => v.id);
@@ -273,6 +274,14 @@ export function Player({
     flash(v ? "Loop on" : "Loop off");
   };
 
+  /** Reaction mode: pause at the end of every track; play starts the next. */
+  const togglePauseAfter = () => {
+    const v = !pauseAfter;
+    setPauseAfter(v);
+    controls.setPauseAfter(v);
+    flash(v ? "Reaction mode on · pauses after each track" : "Reaction mode off");
+  };
+
   const toggleShuffle = () => {
     const v = !shuffle;
     setShuffle(v);
@@ -379,6 +388,7 @@ export function Player({
     ArrowRight: () => controls.seekBy(5),
     j: () => controls.seekBy(-10),
     l: () => toggleLoop(),
+    b: () => togglePauseAfter(),
     r: () => hasQueue && toggleShuffle(),
     n: () => controls.next(),
     p: () => controls.prev(),
@@ -516,7 +526,7 @@ export function Player({
           </Link>
           <div className="flex items-center gap-5">
             <p className="text-xs font-medium text-white/40 max-md:hidden touch:hidden">
-              ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · C cover/lyrics · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
+              ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · B reaction mode · C cover/lyrics · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
             </p>
             {/* Phones set volume with their buttons (iOS ignores page volume). */}
             <div className="touch:hidden">
@@ -586,6 +596,8 @@ export function Player({
               onOffset={adjustOffset}
               effects={effects}
               onEffects={toggleEffects}
+              pauseAfter={pauseAfter}
+              onPauseAfter={togglePauseAfter}
               onSearch={openSearch}
               onSettings={() => setSettingsOpen(true)}
               artistHref={artistHref}

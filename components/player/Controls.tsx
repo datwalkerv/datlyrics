@@ -159,6 +159,8 @@ export function MoreSheet({
   onOffset,
   effects,
   onEffects,
+  pauseAfter,
+  onPauseAfter,
   onSearch,
   onSettings,
   artistHref,
@@ -168,6 +170,8 @@ export function MoreSheet({
   onOffset: (delta: number) => void;
   effects: boolean;
   onEffects: () => void;
+  pauseAfter: boolean;
+  onPauseAfter: () => void;
   onSearch: () => void;
   onSettings: () => void;
   artistHref: string | null;
@@ -199,6 +203,15 @@ export function MoreSheet({
           <span>Background effects</span>
           <span className={`relative h-7 w-12 rounded-full transition ${effects ? "bg-white" : "bg-white/20"}`}>
             <span className={`absolute top-0.5 size-6 rounded-full shadow transition-all ${effects ? "left-[1.375rem] bg-neutral-950" : "left-0.5 bg-white"}`} />
+          </span>
+        </button>
+        <button className={row} onClick={onPauseAfter} role="switch" aria-checked={pauseAfter}>
+          <span>
+            Reaction mode
+            <span className="block text-sm font-normal text-white/45">Pause after each track</span>
+          </span>
+          <span className={`relative h-7 w-12 shrink-0 rounded-full transition ${pauseAfter ? "bg-white" : "bg-white/20"}`}>
+            <span className={`absolute top-0.5 size-6 rounded-full shadow transition-all ${pauseAfter ? "left-[1.375rem] bg-neutral-950" : "left-0.5 bg-white"}`} />
           </span>
         </button>
         {artistHref && (
