@@ -132,6 +132,8 @@ export function useYouTubePlayer(
   // Reaction mode: stop at the end of each track; play then moves on.
   const pauseAfterRef = useRef(false);
   const pauseTimerRef = useRef<ReturnType<typeof setInterval> | undefined>(undefined);
+  // The embed moved on by itself before the timer caught the end: pause the next track as it starts.
+  const holdRef = useRef(false);
   const shuffleRef = useRef(false);
   // The playlist in its own order; queueRef holds it shuffled while shuffle is on.
   const originalRef = useRef<string[]>([]);
@@ -430,6 +432,7 @@ export function useYouTubePlayer(
               // The embed moved along its playlist by itself (media keys, or end of a track).
               // On loop, that advance is the track ending: replay it instead of following.
               if (loopRef.current) return playIndex(indexRef.current);
+              if (pauseAfterRef.current) holdRef.current = true;
               if (!embedListRef.current.length) {
                 // Its playlist is out of date (shuffle, play next), so it moved to the wrong track:
                 // step our queue the same way and load the right one, unless we've already moved on.
@@ -451,6 +454,12 @@ export function useYouTubePlayer(
             }
             // Our lyrics replace YouTube's captions, which some videos switch on by default.
             if (e.data === S.PLAYING) {
+              // Reaction mode missed the end and the embed went on: hold the new track at its start.
+              if (holdRef.current && e.target.getVideoData?.().video_id === loadedIdRef.current) {
+                holdRef.current = false;
+                e.target.pauseVideo();
+                e.target.seekTo(0, true);
+              }
               (e.target as YT.Player & { unloadModule?: (m: string) => void }).unloadModule?.("captions");
               // Right after a track change the embed can still report the previous video's title/duration,
               // and no further event fires to correct it; re-read once it has settled.
@@ -594,6 +603,7 @@ export function useYouTubePlayer(
       return statusRef.current === "paused" && (p.getDuration?.() ?? 0) - p.getCurrentTime() <= 1.5;
     };
     const play = () => {
+      holdRef.current = false;
       if (atEnd()) playIndex(indexRef.current + 1);
       else playerRef.current?.playVideo();
     };
@@ -627,6 +637,7 @@ export function useYouTubePlayer(
       /** Reaction mode: pause just before each track ends (so the embed never starts the next), and let play move on. */
       setPauseAfter: (on: boolean) => {
         pauseAfterRef.current = on;
+        holdRef.current = false;
         clearInterval(pauseTimerRef.current);
         if (!on) return;
         pauseTimerRef.current = setInterval(() => {
