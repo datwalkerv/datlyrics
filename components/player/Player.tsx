@@ -526,7 +526,30 @@ export function Player({
           </Link>
           <div className="flex items-center gap-5">
             <p className="text-xs font-medium text-white/40 max-md:hidden touch:hidden">
-              ⌘K search ·{hasQueue ? " Q queue · R shuffle ·" : ""} S save · L loop · B reaction mode · C cover/lyrics · E effects · Space play/pause · ←/→ seek · ↑/↓ volume · N/P next/prev · [ ] offset · V video · F fullscreen
+              {/* The toggles that are on read brighter. */}
+              {(
+                [
+                  ["⌘K search"],
+                  ...(hasQueue ? [["Q queue", queueOpen], ["R shuffle", shuffle]] : []),
+                  ["S save"],
+                  ["L loop", loop],
+                  ["B reaction mode", pauseAfter],
+                  ["C cover/lyrics"],
+                  ["E effects", effects],
+                  ["Space play/pause"],
+                  ["←/→ seek"],
+                  ["↑/↓ volume"],
+                  ["N/P next/prev"],
+                  ["[ ] offset"],
+                  ["V video", videoMode],
+                  ["F fullscreen"],
+                ] as [string, boolean?][]
+              ).map(([label, on], i) => (
+                <span key={label}>
+                  {i > 0 && " · "}
+                  <span className={on ? "text-white" : undefined}>{label}</span>
+                </span>
+              ))}
             </p>
             {/* Phones set volume with their buttons (iOS ignores page volume). */}
             <div className="touch:hidden">
